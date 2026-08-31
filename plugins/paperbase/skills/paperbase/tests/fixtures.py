@@ -11,11 +11,40 @@ from __future__ import annotations
 import os
 import zipfile
 
-try:
-    import fitz  # type: ignore
-    HAVE_FITZ = True
-except Exception:  # pragma: no cover
-    HAVE_FITZ = False
+# Resolve PyMuPDF lazily. paperbase installs it into a private directory on first run
+# and puts that directory on sys.path when the package is imported, so a module-level
+# import here would decide "no PDF support" before that ever happens.
+fitz = None
+
+
+def _fitz():
+    global fitz
+    if fitz is None:
+        from paperbase import bootstrap  # activates the private library directory
+        bootstrap.activate()
+        import fitz as _f  # type: ignore
+        fitz = _f
+    return fitz
+
+
+def have_fitz() -> bool:
+    try:
+        _fitz()
+        return True
+    except Exception:
+        return False
+
+
+class _HaveFitz(object):
+    """Backwards-compatible truthy flag that resolves at access time."""
+
+    def __bool__(self):
+        return have_fitz()
+
+    __nonzero__ = __bool__
+
+
+HAVE_FITZ = _HaveFitz()
 
 A = {
     "title": "Alpha: a fast corrector for widget reads",
@@ -39,7 +68,7 @@ A = {
 
 
 def _pdf_paper_a(path: str) -> None:
-    doc = fitz.open()
+    doc = _fitz().open()
     page = doc.new_page()
     page.insert_text((60, 70), "Widget Analysis", fontsize=9)
     page.insert_text((60, 100), A["title"], fontsize=17)
@@ -48,35 +77,35 @@ def _pdf_paper_a(path: str) -> None:
     page.insert_text((60, 165), "(c) 2019 Widget Press. Received 1 January 2019; accepted 2 March 2019",
                      fontsize=8)
     page.insert_text((60, 198), "Abstract", fontsize=13)
-    page.insert_textbox(fitz.Rect(60, 205, 540, 285), A["abstract"], fontsize=10)
+    page.insert_textbox(_fitz().Rect(60, 205, 540, 285), A["abstract"], fontsize=10)
     page.insert_text((60, 313), "1 Introduction", fontsize=13)
-    page.insert_textbox(fitz.Rect(60, 320, 290, 560), A["intro"], fontsize=10)
+    page.insert_textbox(_fitz().Rect(60, 320, 290, 560), A["intro"], fontsize=10)
     page.insert_text((310, 313), "2 Methods", fontsize=13)
-    page.insert_textbox(fitz.Rect(310, 320, 540, 560), A["methods"], fontsize=10)
+    page.insert_textbox(_fitz().Rect(310, 320, 540, 560), A["methods"], fontsize=10)
     page.insert_text((280, 800), "1", fontsize=8)
     page2 = doc.new_page()
     page2.insert_text((60, 70), "Widget Analysis", fontsize=9)
     page2.insert_text((60, 113), "3 Results", fontsize=13)
-    page2.insert_textbox(fitz.Rect(60, 122, 540, 260), A["results"], fontsize=10)
-    page2.insert_textbox(fitz.Rect(60, 280, 540, 298), A["caption"], fontsize=9)
-    page2.insert_textbox(fitz.Rect(60, 302, 540, 340), A["table"], fontsize=9)
+    page2.insert_textbox(_fitz().Rect(60, 122, 540, 260), A["results"], fontsize=10)
+    page2.insert_textbox(_fitz().Rect(60, 280, 540, 298), A["caption"], fontsize=9)
+    page2.insert_textbox(_fitz().Rect(60, 302, 540, 340), A["table"], fontsize=9)
     page2.insert_text((60, 356), "Widget calibration", fontsize=10)
-    page2.insert_textbox(fitz.Rect(60, 360, 540, 372),
+    page2.insert_textbox(_fitz().Rect(60, 360, 540, 372),
                          "Calibration used the vendor default profile.", fontsize=10)
     page2.insert_text((280, 800), "2", fontsize=8)
     page3 = doc.new_page()
     page3.insert_text((60, 70), "Widget Analysis", fontsize=9)
     page3.insert_text((60, 113), "4 Conclusion", fontsize=13)
-    page3.insert_textbox(fitz.Rect(60, 122, 540, 220),
+    page3.insert_textbox(_fitz().Rect(60, 122, 540, 220),
                          "Alpha shows that non-greedy search can reduce overcorrection on widget "
                          "reads without a speed penalty. Indel-aware correction remains future work.",
                          fontsize=10)
     page3.insert_text((60, 240), "Author summary", fontsize=13)
-    page3.insert_textbox(fitz.Rect(60, 248, 540, 300),
+    page3.insert_textbox(_fitz().Rect(60, 248, 540, 300),
                          "We built a non-greedy corrector for widget reads and showed it makes "
                          "fewer overcorrections than greedy tools on real data.", fontsize=10)
     page3.insert_text((60, 330), "References", fontsize=13)
-    page3.insert_textbox(fitz.Rect(60, 340, 540, 430),
+    page3.insert_textbox(_fitz().Rect(60, 340, 540, 430),
                          "1. Gamma G. Gamma: greedy widget correction. Widget J. 2016.\n"
                          "2. Delta D. On repeat-rich widgets. Widget J. 2017.", fontsize=9)
     page3.insert_text((280, 800), "3", fontsize=8)
@@ -87,7 +116,7 @@ def _pdf_paper_a(path: str) -> None:
 
 def _pdf_paper_b(path: str, changed: bool = False) -> None:
     """Second tool paper: disagrees with A on precision, on different data."""
-    doc = fitz.open()
+    doc = _fitz().open()
     page = doc.new_page()
     page.insert_text((60, 70), "Widget Analysis", fontsize=9)
     page.insert_text((60, 100), "Gamma 2.0: learned gating for widget correction", fontsize=17)
@@ -96,34 +125,34 @@ def _pdf_paper_b(path: str, changed: bool = False) -> None:
     page.insert_text((60, 165), "(c) 2022 Widget Press", fontsize=8)
     page.insert_text((60, 198), "Abstract", fontsize=13)
     page.insert_textbox(
-        fitz.Rect(60, 205, 540, 300),
+        _fitz().Rect(60, 205, 540, 300),
         "Summary: Gamma 2.0 replaces hand-crafted conditions with a learned classifier. "
         "On simulated widget data Gamma 2.0 makes %s fewer false-positive corrections than "
         "Alpha, while Alpha retains the highest true-positive count."
         % ("an order of magnitude" if not changed else "two orders of magnitude"), fontsize=10)
     page.insert_text((60, 333), "1 Methods", fontsize=13)
-    page.insert_textbox(fitz.Rect(60, 342, 540, 460),
+    page.insert_textbox(_fitz().Rect(60, 342, 540, 460),
                         "We simulated 20 million widget reads at 30x coverage with the WSIM "
                         "simulator, which provides error-free ground truth. False positives are "
                         "counted per base. Competing tools were run with default settings.",
                         fontsize=10)
     page.insert_text((60, 493), "2 Discussion", fontsize=13)
-    page.insert_textbox(fitz.Rect(60, 502, 540, 600),
+    page.insert_textbox(_fitz().Rect(60, 502, 540, 600),
                         "Good results on simulated data may not translate to real data because "
                         "simulator error models can differ from real instruments. Low coverage "
                         "was not evaluated. Corrections are decided from a multiple sequence "
                         "alignment (MSA) of candidate reads; every MSA column is scored "
                         "independently.", fontsize=10)
     page.insert_text((60, 612), "Widget calibration", fontsize=10)
-    page.insert_textbox(fitz.Rect(60, 616, 540, 630),
+    page.insert_textbox(_fitz().Rect(60, 616, 540, 630),
                         "Calibration followed the vendor default profile.", fontsize=10)
     page.insert_text((60, 640), "Author summary", fontsize=13)
-    page.insert_textbox(fitz.Rect(60, 648, 540, 700),
+    page.insert_textbox(_fitz().Rect(60, 648, 540, 700),
                         "We replaced hand-written correction rules with a learned classifier and "
                         "measured far fewer false-positive corrections on simulated widget data.",
                         fontsize=10)
     page.insert_text((60, 715), "References", fontsize=13)
-    page.insert_textbox(fitz.Rect(60, 723, 540, 780),
+    page.insert_textbox(_fitz().Rect(60, 723, 540, 780),
                         "1. Alpha A. Alpha: a fast corrector for widget reads. Widget J. 2019.",
                         fontsize=9)
     doc.save(path)
@@ -132,10 +161,10 @@ def _pdf_paper_b(path: str, changed: bool = False) -> None:
 
 def _pdf_image_only(path: str) -> None:
     """A PDF with drawings but no extractable text: must warn, never invent content."""
-    doc = fitz.open()
+    doc = _fitz().open()
     page = doc.new_page()
-    page.draw_rect(fitz.Rect(100, 100, 400, 400), color=(0, 0, 0), fill=(0.6, 0.6, 0.6))
-    page.draw_line(fitz.Point(100, 100), fitz.Point(400, 400))
+    page.draw_rect(_fitz().Rect(100, 100, 400, 400), color=(0, 0, 0), fill=(0.6, 0.6, 0.6))
+    page.draw_line(_fitz().Point(100, 100), _fitz().Point(400, 400))
     doc.save(path)
     doc.close()
 
