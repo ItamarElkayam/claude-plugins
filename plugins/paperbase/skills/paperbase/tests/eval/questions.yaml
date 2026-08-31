@@ -1,0 +1,48 @@
+# Evaluation question-set TEMPLATE.
+#
+# Copy to <kb>/eval/questions.yaml and replace the placeholders with real ids from your
+# corpus (`kb search <kb> "<terms>" --kind papers` and `kb show-paper` give you ids).
+# `kb eval <kb>` reads <kb>/eval/questions.yaml by default; pass a path to use another set.
+#
+# Per question:
+#   question                 the natural-language question, exactly as an agent would ask it
+#   expect_papers            paper ids (or unambiguous id prefixes) that must surface
+#   expect_claims            specific claim ids that must be cited          (optional)
+#   must_include_terms       strings that must appear in the pack            (optional)
+#   expect_counterevidence   true when the pack must contain opposing/negative evidence
+#   budget                   token budget for this question's pack
+#   min_paper_recall / min_claim_recall / min_term_coverage / min_locator_validity
+#                            thresholds, all default 1.0
+#
+# Aim for at least: one single-paper factual question, one cross-paper comparison, one
+# disagreement question, and one scope/gap question.
+
+questions:
+  - id: q1-single-paper-fact
+    question: "REPLACE: a factual question answerable from exactly one paper"
+    expect_papers: ["REPLACE-with-a-paper-id"]
+    expect_claims: ["REPLACE-with-a-claim-id"]
+    must_include_terms: ["REPLACE-with-a-phrase-that-must-appear"]
+    expect_counterevidence: false
+    budget: 4000
+
+  - id: q2-cross-paper-comparison
+    question: "REPLACE: how do X and Y compare on <metric>?"
+    expect_papers: ["REPLACE-paper-a", "REPLACE-paper-b"]
+    expect_counterevidence: true
+    min_claim_recall: 0.5
+    budget: 6000
+
+  - id: q3-disagreement
+    question: "REPLACE: is there disagreement about <question>, and what explains it?"
+    expect_papers: ["REPLACE-paper-a", "REPLACE-paper-b"]
+    must_include_terms: ["REPLACE-with-the-dimension-that-differs"]
+    expect_counterevidence: true
+    budget: 8000
+
+  - id: q4-scope-and-gaps
+    question: "REPLACE: under what conditions was this evaluated, and what is untested?"
+    expect_papers: ["REPLACE-with-a-paper-id"]
+    must_include_terms: ["REPLACE-with-a-condition-such-as-a-coverage-or-sample-size"]
+    expect_counterevidence: false
+    budget: 6000

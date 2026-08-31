@@ -1,0 +1,104 @@
+# paperbase default configuration.
+#
+# `kb build` copies this file to <kb>/config/config.yaml on first run. Edit the
+# copy inside the KB - it is canonical for that corpus, is hashed into every
+# stage fingerprint, and changing it marks the affected stages stale.
+# Every key below is documented; unknown keys are rejected with an error.
+
+ingestion:
+  # Extensions actually parsed into knowledge units.
+  text_extensions: [".pdf", ".html", ".htm", ".xhtml", ".docx", ".md", ".markdown", ".txt", ".text"]
+  # Recorded in the manifest as companion material, listed but not parsed.
+  archive_extensions: [".zip", ".tar", ".gz", ".tgz", ".7z", ".rar"]
+  # Recorded as unsupported-with-reason rather than silently skipped.
+  ignore_globs: [".DS_Store", "__MACOSX/*", "*.tmp", "~$*", ".git/*"]
+  max_file_mb: 200
+  # false: the KB references originals in place (originals are never modified).
+  # true: also copy each source into <kb>/sources/ for archival self-containment.
+  copy_sources: false
+  follow_symlinks: false
+
+parsing:
+  # First adapter that yields usable text wins; the choice is recorded per paper.
+  pdf_adapters: ["pymupdf", "pypdf"]
+  # A page with fewer body characters than this counts as text-poor.
+  min_chars_per_page: 120
+  # A document is flagged needs_ocr when this fraction of pages is text-poor.
+  poor_page_fraction: 0.34
+  # Repeated top/bottom band text on at least this fraction of pages is a
+  # running header/footer and is kept out of the scientific body.
+  header_footer_page_fraction: 0.4
+  header_band: 0.10     # fraction of page height treated as the header band
+  footer_band: 0.10
+  # Two-column detection: minimum blocks per column and maximum fraction of
+  # blocks allowed to straddle the gutter. 2 is safe because full-width blocks are
+  # classified as spanning (and so excluded) before this count is taken.
+  column_min_blocks: 2
+  column_max_straddle: 0.25
+  dehyphenate: true
+  # Extra headings that should start a top-level section in your corpus
+  # (matched case-insensitively against the whole heading line).
+  extra_section_headings: []
+  ocr:
+    enabled: false       # OCR is opt-in; see references/ingestion-workflow.md
+    page_dpi: 200
+    render_cmd: "pdftoppm -r {dpi} -png -f {page} -l {page} {pdf} {out_prefix}"
+    ocr_cmd: "tesseract {image} stdout -l eng"
+    min_confidence: 0.5  # recorded on every OCR-derived locator
+
+units:
+  max_chars: 1500        # retrieval unit ceiling (~375 tokens)
+  min_chars: 220         # merge shorter paragraphs forward
+  include_references_section: false   # reference lists are indexed separately
+  keep_captions: true
+  keep_tables: true
+
+metadata:
+  # Offline heuristics are always used. External enrichment is opt-in and its
+  # provenance is recorded per field.
+  enrichment_enabled: false
+  enrichment_sources: ["crossref"]
+  supplementary_filename_markers: ["supp", "supplement", "supporting", "_si", "-si", "appendix", "_s1", "_s2"]
+  preprint_venues: ["arxiv", "biorxiv", "medrxiv", "preprints.org", "ssrn", "hal", "osf"]
+  # Title similarity above this links a preprint to its published version.
+  family_title_similarity: 0.82
+
+terminology:
+  # Corpus-specific vocabulary. Synonyms are used to expand lexical queries and
+  # to seed the terminology map; add your field's aliases here.
+  synonyms: {}
+  acronyms: {}
+  priority_terms: []
+  extra_stopwords: []
+
+retrieval:
+  top_units: 40
+  top_claims: 30
+  max_units_per_paper: 3
+  default_budget_tokens: 8000
+  # Share of the context budget per section (normalised if they do not sum to 1).
+  budget_split:
+    synthesis: 0.18
+    claims: 0.30
+    passages: 0.34
+    papers: 0.10
+    relations: 0.08
+  # A context pack must spend at least this share of the claim budget on
+  # counterevidence when any contradicting/qualifying claim exists.
+  min_counterevidence_share: 0.2
+  chars_per_token: 4
+
+analysis:
+  # Recorded in fingerprints so a model or prompt change invalidates analyses.
+  model_id: "unspecified"
+  # Stages whose output must exist before corpus synthesis is considered complete.
+  required_stages: ["profile", "claims"]
+  min_claims_per_paper: 3
+  max_claims_per_paper: 60
+
+validation:
+  excerpt_min_chars: 25
+  # Excerpt must match normalized source text after whitespace folding.
+  excerpt_match: "normalized"
+  fail_on: ["broken_locator", "missing_locator", "excerpt_mismatch", "schema_error", "dangling_reference"]
+  warn_on: ["ocr_excerpt", "duplicate_claim", "unsupported_synthesis", "poor_parse", "stale_stage"]

@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "relation.schema.json",
+  "title": "Cross-paper or cross-claim relationship",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["relation_id", "source_paper_id", "relation", "rationale", "confidence", "origin"],
+  "properties": {
+    "relation_id": {"type": "string"},
+    "source_paper_id": {"type": "string"},
+    "target_paper_id": {"type": ["string", "null"], "description": "null only for unresolved family links, which `kb validate` reports."},
+    "source_claim_id": {"type": ["string", "null"]},
+    "target_claim_id": {"type": ["string", "null"]},
+    "relation": {
+      "type": "string",
+      "enum": ["supports", "contradicts", "partially-contradicts", "qualifies", "extends", "reproduces", "fails-to-reproduce", "applies", "improves-on", "compares-with", "uses-method-from", "uses-data-from", "shares-dataset", "addresses-same-question", "studies-different-context", "cites", "supplement-of", "preprint-of", "possible-duplicate-of"]
+    },
+    "dimension": {"type": ["string", "null"], "description": "What is being compared: metric, dataset, organism, coverage regime, task, definition, document_family..."},
+    "rationale": {"type": "string", "minLength": 10},
+    "evidence_source": {"type": "array", "items": {"$ref": "locator.schema.json"}},
+    "evidence_target": {"type": "array", "items": {"$ref": "locator.schema.json"}},
+    "difference_explanations": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "For contradicts/partially-contradicts: the checked alternative explanations (population, organism, task, data, preprocessing, design, metric, outcome definition, model version, statistical power)."
+    },
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "origin": {
+      "type": "string",
+      "enum": ["author_stated", "inferred_by_analysis", "inferred_by_paperbase_heuristic", "human_override"]
+    },
+    "basis": {"type": ["string", "null"]},
+    "generated_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "model_id": {"type": "string"},
+        "prompt": {"type": "string"},
+        "prompt_version": {"type": "string"},
+        "generated_at": {"type": "string"},
+        "reviewed_by_human": {"type": "boolean"}
+      }
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "terminology.schema.json",
+  "title": "Terminology, synonyms and conflicting definitions across the corpus",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["terms", "generated_by"],
+  "properties": {
+    "terms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["term"],
+        "properties": {
+          "term": {"type": "string"},
+          "canonical": {"type": ["string", "null"], "description": "Preferred form when several are in use."},
+          "synonyms": {"type": "array", "items": {"type": "string"}},
+          "acronym_of": {"type": ["string", "null"]},
+          "definition": {"type": ["string", "null"]},
+          "definition_claim_ids": {"type": "array", "items": {"type": "string"}},
+          "conflicting_definitions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["paper_id", "definition"],
+              "properties": {
+                "paper_id": {"type": "string"},
+                "definition": {"type": "string"},
+                "claim_ids": {"type": "array", "items": {"type": "string"}},
+                "note": {"type": ["string", "null"]}
+              }
+            }
+          },
+          "paper_ids": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "generated_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model_id", "prompt", "prompt_version", "generated_at"],
+      "properties": {
+        "model_id": {"type": "string"},
+        "prompt": {"type": "string"},
+        "prompt_version": {"type": "string"},
+        "generated_at": {"type": "string"},
+        "reviewed_by_human": {"type": "boolean"}
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "paperbase-tools",
+  "owner": {
+    "name": "Itamar Elkayam"
+  },
+  "plugins": [
+    {
+      "name": "paperbase",
+      "source": "./plugins/paperbase",
+      "description": "Turn a directory of scientific papers into a durable, incrementally maintainable knowledge base optimized for AI-agent context.",
+      "version": "1.0.0",
+      "keywords": ["research", "literature", "pdf", "knowledge-base", "rag", "provenance"]
+    }
+  ]
+}

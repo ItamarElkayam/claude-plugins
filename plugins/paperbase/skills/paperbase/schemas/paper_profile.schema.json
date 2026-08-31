@@ -1,0 +1,117 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "paper_profile.schema.json",
+  "title": "Structured research profile for one paper",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["paper_id", "schema_version", "analysis", "generated_by"],
+  "definitions": {
+    "basis": {
+      "type": "string",
+      "enum": ["author_stated", "shown_by_result", "agent_inferred", "unavailable"],
+      "description": "author_stated: the authors say it. shown_by_result: directly visible in a reported result. agent_inferred: the analysing model's own reasoning (needs rationale). unavailable: not determinable from the document."
+    },
+    "statement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "basis"],
+      "properties": {
+        "text": {"type": ["string", "null"]},
+        "basis": {"$ref": "#/definitions/basis"},
+        "rationale": {"type": ["string", "null"], "description": "Required when basis is agent_inferred."},
+        "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "locators": {"type": "array", "items": {"$ref": "locator.schema.json"}}
+      }
+    },
+    "named_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "basis"],
+      "properties": {
+        "name": {"type": "string"},
+        "kind": {"type": ["string", "null"], "description": "e.g. dataset, benchmark, model, algorithm, tool, instrument, organism, metric"},
+        "role": {"type": ["string", "null"], "description": "e.g. proposed, baseline, control, evaluation-data, training-data, comparator"},
+        "detail": {"type": ["string", "null"]},
+        "version": {"type": ["string", "null"]},
+        "size": {"type": ["string", "null"], "description": "Sample size / dataset size as reported, verbatim units."},
+        "basis": {"$ref": "#/definitions/basis"},
+        "locators": {"type": "array", "items": {"$ref": "locator.schema.json"}}
+      }
+    }
+  },
+  "properties": {
+    "paper_id": {"type": "string"},
+    "schema_version": {"type": "string"},
+    "generated_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model_id", "prompt", "prompt_version", "generated_at"],
+      "properties": {
+        "model_id": {"type": "string"},
+        "prompt": {"type": "string"},
+        "prompt_version": {"type": "string"},
+        "generated_at": {"type": "string"},
+        "reviewed_by_human": {"type": "boolean"}
+      }
+    },
+    "analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["research_problem", "main_contribution", "study_type", "primary_findings"],
+      "properties": {
+        "research_problem": {"$ref": "#/definitions/statement"},
+        "motivation": {"$ref": "#/definitions/statement"},
+        "research_questions": {"type": "array", "items": {"$ref": "#/definitions/statement"}},
+        "hypotheses": {"type": "array", "items": {"$ref": "#/definitions/statement"}},
+        "main_contribution": {"$ref": "#/definitions/statement"},
+        "study_type": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["value", "basis"],
+          "properties": {
+            "value": {"type": "string", "enum": ["method_or_tool", "empirical_study", "benchmark_or_comparison", "review_or_survey", "theory", "dataset_or_resource", "case_study", "simulation_study", "position_paper", "other", "unknown"]},
+            "detail": {"type": ["string", "null"]},
+            "basis": {"$ref": "#/definitions/basis"},
+            "locators": {"type": "array", "items": {"$ref": "locator.schema.json"}}
+          }
+        },
+        "definitions": {"type": "array", "items": {"$ref": "#/definitions/named_item"}},
+        "methods": {"type": "array", "items": {"$ref": "#/definitions/named_item"}},
+        "experimental_design": {"$ref": "#/definitions/statement"},
+        "domain": {"$ref": "#/definitions/statement"},
+        "population_or_task": {"$ref": "#/definitions/statement"},
+        "data_sources": {"type": "array", "items": {"$ref": "#/definitions/named_item"}},
+        "models_or_interventions": {"type": "array", "items": {"$ref": "#/definitions/named_item"}},
+        "baselines_and_controls": {"type": "array", "items": {"$ref": "#/definitions/named_item"}},
+        "evaluation_metrics": {"type": "array", "items": {"$ref": "#/definitions/named_item"}},
+        "primary_findings": {"type": "array", "minItems": 1, "items": {"$ref": "#/definitions/statement"}},
+        "secondary_findings": {"type": "array", "items": {"$ref": "#/definitions/statement"}},
+        "negative_or_null_findings": {"type": "array", "items": {"$ref": "#/definitions/statement"}},
+        "quantitative_results": {"type": "array", "items": {"$ref": "#/definitions/statement"}},
+        "assumptions": {"type": "array", "items": {"$ref": "#/definitions/statement"}},
+        "scope_and_boundary_conditions": {"type": "array", "items": {"$ref": "#/definitions/statement"}},
+        "limitations_stated": {"type": "array", "items": {"$ref": "#/definitions/statement"}},
+        "limitations_inferred": {"type": "array", "items": {"$ref": "#/definitions/statement"}},
+        "threats_to_validity": {"type": "array", "items": {"$ref": "#/definitions/statement"}},
+        "future_work_stated": {"type": "array", "items": {"$ref": "#/definitions/statement"}},
+        "reproducibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "code_available": {"type": ["boolean", "null"]},
+            "code_location": {"type": ["string", "null"]},
+            "data_available": {"type": ["boolean", "null"]},
+            "data_location": {"type": ["string", "null"]},
+            "notes": {"$ref": "#/definitions/statement"}
+          }
+        },
+        "key_tables_and_figures": {"type": "array", "items": {"$ref": "#/definitions/named_item"}},
+        "retrieval_terms": {"type": "array", "items": {"type": "string"}, "description": "Terms and identifiers a future agent would use to find this paper."},
+        "concepts": {"type": "array", "items": {"type": "string"}},
+        "unresolved_questions": {"type": "array", "items": {"$ref": "#/definitions/statement"}},
+        "extraction_warnings": {"type": "array", "items": {"type": "string"}, "description": "e.g. table could not be interpreted, section missing, OCR text used."},
+        "unavailable_fields": {"type": "array", "items": {"type": "string"}, "description": "Field names that could not be determined from the document. Explicit is better than empty."}
+      }
+    }
+  }
+}

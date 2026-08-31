@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "locator.schema.json",
+  "title": "Source locator",
+  "description": "A pointer from generated knowledge back to an exact place in normalized source text. Character offsets are into <kb>/docs/<paper_id>/text.txt, which is the canonical offset space.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["paper_id", "excerpt", "extraction_method", "confidence"],
+  "anyOf": [
+    {"required": ["unit_id"]},
+    {"required": ["char_start", "char_end"]}
+  ],
+  "properties": {
+    "paper_id": {"type": "string", "minLength": 3},
+    "source_filename": {"type": ["string", "null"], "description": "Basename of the original document."},
+    "unit_id": {"type": ["string", "null"], "pattern": "^u\\d{4}$"},
+    "block_id": {"type": ["string", "null"], "pattern": "^b\\d{5}$"},
+    "page_index": {"type": ["integer", "null"], "minimum": 0, "description": "0-based physical page."},
+    "page_label": {"type": ["string", "null"], "description": "Printed page label, e.g. '2886' or 'S3'."},
+    "section_path": {"type": "array", "items": {"type": "string"}},
+    "sentence_index": {"type": ["integer", "null"], "minimum": 0, "description": "Index into the unit's sentence_offsets."},
+    "table_label": {"type": ["string", "null"]},
+    "figure_label": {"type": ["string", "null"]},
+    "line_start": {"type": ["integer", "null"], "minimum": 1, "description": "For non-paginated sources."},
+    "anchor": {"type": ["string", "null"], "description": "HTML id / stable anchor for non-paginated sources."},
+    "char_start": {"type": ["integer", "null"], "minimum": 0},
+    "char_end": {"type": ["integer", "null"], "minimum": 0},
+    "excerpt": {"type": "string", "minLength": 10, "description": "Short verbatim quote from the normalized text; validated by `kb validate`."},
+    "extraction_method": {"type": "string", "enum": ["pymupdf", "pypdf", "html", "docx", "text", "ocr", "human"]},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

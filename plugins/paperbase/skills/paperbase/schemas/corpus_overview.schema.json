@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "corpus_overview.schema.json",
+  "title": "Corpus-level synthesis: consensus, disagreement, gaps, directions",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["field_summary", "generated_by"],
+  "definitions": {
+    "grounded_point": {"$ref": "topic.schema.json#/definitions/grounded_point"}
+  },
+  "properties": {
+    "field_summary": {"type": "string", "minLength": 80},
+    "scope_note": {"type": ["string", "null"], "description": "What this corpus does and does not cover - guards against over-reading."},
+    "topic_map": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["topic_id", "name"],
+        "properties": {
+          "topic_id": {"type": "string"},
+          "name": {"type": "string"},
+          "subtopics": {"type": "array", "items": {"type": "string"}},
+          "paper_ids": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "strong_agreement": {"type": "array", "items": {"$ref": "#/definitions/grounded_point"}},
+    "qualified_agreement": {"type": "array", "items": {"$ref": "#/definitions/grounded_point"}},
+    "genuine_contradictions": {"type": "array", "items": {"$ref": "#/definitions/grounded_point"}},
+    "apparent_contradictions_explained": {"type": "array", "items": {"$ref": "#/definitions/grounded_point"}},
+    "evidence_strength_assessment": {"type": "array", "items": {"$ref": "#/definitions/grounded_point"}},
+    "common_limitations": {"type": "array", "items": {"$ref": "#/definitions/grounded_point"}},
+    "failure_modes": {"type": "array", "items": {"$ref": "#/definitions/grounded_point"}},
+    "understudied_conditions": {"type": "array", "items": {"$ref": "#/definitions/grounded_point"}},
+    "open_questions": {"type": "array", "items": {"$ref": "#/definitions/grounded_point"}},
+    "research_gaps": {"type": "array", "items": {"$ref": "#/definitions/grounded_point"}},
+    "foundational_papers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["paper_id", "why"],
+        "properties": {
+          "paper_id": {"type": "string"},
+          "why": {"type": "string"},
+          "claim_ids": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "field_changing_papers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["paper_id", "why"],
+        "properties": {
+          "paper_id": {"type": "string"},
+          "why": {"type": "string"},
+          "claim_ids": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "Method/dataset/finding dependencies, e.g. 'tool B's evaluation depends on dataset D introduced by paper A'.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to", "kind"],
+        "properties": {
+          "from": {"type": "string"},
+          "to": {"type": "string"},
+          "kind": {"type": "string"},
+          "note": {"type": ["string", "null"]},
+          "claim_ids": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "generated_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model_id", "prompt", "prompt_version", "generated_at"],
+      "properties": {
+        "model_id": {"type": "string"},
+        "prompt": {"type": "string"},
+        "prompt_version": {"type": "string"},
+        "generated_at": {"type": "string"},
+        "reviewed_by_human": {"type": "boolean"}
+      }
+    }
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "claim.schema.json",
+  "title": "Atomic, independently referenceable claim",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["claim_id", "paper_id", "statement", "claim_type", "evidence_status", "polarity", "support", "confidence", "generated_by"],
+  "properties": {
+    "claim_id": {"type": "string", "minLength": 5},
+    "paper_id": {"type": "string"},
+    "statement": {"type": "string", "minLength": 15, "description": "One normalized, self-contained assertion with its qualifiers intact."},
+    "claim_type": {
+      "type": "string",
+      "enum": ["empirical_result", "performance_comparison", "mechanism", "method_property", "dataset_property", "theoretical_result", "negative_result", "limitation", "recommendation", "background_or_cited", "hypothesis", "interpretation", "future_work"]
+    },
+    "evidence_status": {
+      "type": "string",
+      "enum": ["reported", "quoted", "calculated", "inferred"],
+      "description": "reported: authors state it as their result. quoted: verbatim from the paper. calculated: derived arithmetically from reported numbers (show the arithmetic in derivation). inferred: the analysing model's reading."
+    },
+    "derivation": {"type": ["string", "null"], "description": "Required when evidence_status is calculated or inferred."},
+    "polarity": {"type": "string", "enum": ["affirmative", "negative", "null_result", "mixed"]},
+    "subject": {"type": ["string", "null"], "description": "Population, organism, task, corpus or system the claim is about."},
+    "intervention": {"type": ["string", "null"], "description": "Method, model, exposure or input."},
+    "comparator": {"type": ["string", "null"]},
+    "outcome": {"type": ["string", "null"]},
+    "effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "direction": {"type": ["string", "null"], "enum": ["increase", "decrease", "no_change", "mixed", "not_applicable", null]},
+        "magnitude": {"type": ["string", "null"], "description": "Verbatim value with units, e.g. '3.2x fewer false positives', 'F1 0.87 vs 0.81'."},
+        "uncertainty": {"type": ["string", "null"], "description": "CI, sd, p-value, or 'not reported'."},
+        "statistical_test": {"type": ["string", "null"]},
+        "significant": {"type": ["boolean", "null"]}
+      }
+    },
+    "conditions": {"type": "array", "items": {"type": "string"}, "description": "Scope conditions under which the claim holds (coverage, platform, dataset, hyperparameters...)."},
+    "qualifiers": {"type": "array", "items": {"type": "string"}, "description": "Hedges and caveats preserved verbatim in spirit: 'may', 'in our setting', 'not statistically significant'."},
+    "evidence_type": {
+      "type": "string",
+      "enum": ["experiment", "simulation", "benchmark", "observational", "proof", "ablation", "case_study", "expert_assertion", "citation_of_other_work", "none_stated"]
+    },
+    "support": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "locator.schema.json"},
+      "description": "At least one source locator. A claim without support is invalid."
+    },
+    "section_origin": {"type": ["string", "null"], "description": "Which section the claim came from - used to separate primary results from introduction/related-work assertions."},
+    "is_primary_evidence": {"type": "boolean", "description": "false when the claim only appears in introduction/related work, i.e. it is this paper reporting someone else's finding."},
+    "cited_source": {"type": ["string", "null"], "description": "When is_primary_evidence is false: whose work the claim belongs to, as printed."},
+    "concepts": {"type": "array", "items": {"type": "string"}},
+    "methods": {"type": "array", "items": {"type": "string"}},
+    "datasets": {"type": "array", "items": {"type": "string"}},
+    "entities": {"type": "array", "items": {"type": "string"}},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1, "description": "Extraction confidence: how sure the analysing model is that the paper says this."},
+    "duplicate_of": {"type": ["string", "null"], "description": "Set by `kb validate` / human override when this claim restates another."},
+    "generated_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model_id", "prompt", "prompt_version", "generated_at"],
+      "properties": {
+        "model_id": {"type": "string"},
+        "prompt": {"type": "string"},
+        "prompt_version": {"type": "string"},
+        "generated_at": {"type": "string"},
+        "reviewed_by_human": {"type": "boolean"}
+      }
+    }
+  }
+}

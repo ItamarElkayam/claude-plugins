@@ -1,0 +1,122 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "overrides.schema.json",
+  "title": "Human corrections, applied after every automated run",
+  "description": "Files matching <kb>/overrides/*.yaml (or .json). Overrides are never regenerated, never silently dropped, and always win over automated output. Unknown ids are reported by `kb validate`, not discarded.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "note": {"type": "string"},
+    "papers": {
+      "type": "object",
+      "description": "Keyed by paper_id.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "title": {"type": "string"},
+              "authors": {"type": "array", "items": {"type": "string"}},
+              "year": {"type": ["integer", "null"]},
+              "venue": {"type": ["string", "null"]},
+              "doi": {"type": ["string", "null"]},
+              "arxiv_id": {"type": ["string", "null"]},
+              "pmid": {"type": ["string", "null"]},
+              "document_type": {"type": "string"},
+              "publication_status": {"type": "string", "enum": ["preprint", "accepted_manuscript", "published", "unknown"]},
+              "keywords": {"type": "array", "items": {"type": "string"}},
+              "language": {"type": "string"}
+            }
+          },
+          "topics": {"type": "array", "items": {"type": "string"}},
+          "exclude": {"type": "boolean", "description": "Keep the document on disk but exclude it from the KB (e.g. an irrelevant file)."},
+          "notes": {"type": "string"}
+        }
+      }
+    },
+    "claims": {
+      "type": "object",
+      "description": "Keyed by claim_id. `delete: true` removes a wrong claim; any other key patches that field.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "delete": {"type": "boolean"},
+          "statement": {"type": "string"},
+          "claim_type": {"type": "string"},
+          "evidence_status": {"type": "string"},
+          "polarity": {"type": "string"},
+          "conditions": {"type": "array", "items": {"type": "string"}},
+          "qualifiers": {"type": "array", "items": {"type": "string"}},
+          "confidence": {"type": "number"},
+          "support": {"type": "array", "items": {"$ref": "locator.schema.json"}},
+          "duplicate_of": {"type": ["string", "null"]},
+          "notes": {"type": "string"}
+        }
+      }
+    },
+    "relations": {
+      "type": "array",
+      "description": "Human-authored relations (origin is forced to human_override) or corrections keyed by relation_id.",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["source_paper_id", "relation"],
+        "properties": {
+          "relation_id": {"type": "string"},
+          "source_paper_id": {"type": "string"},
+          "target_paper_id": {"type": ["string", "null"]},
+          "source_claim_id": {"type": ["string", "null"]},
+          "target_claim_id": {"type": ["string", "null"]},
+          "relation": {"type": "string"},
+          "dimension": {"type": ["string", "null"]},
+          "rationale": {"type": "string"},
+          "confidence": {"type": "number"},
+          "delete": {"type": "boolean"},
+          "difference_explanations": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "duplicates": {
+      "type": "array",
+      "description": "Deliberate duplicate resolutions. keep/drop are paper_ids; nothing is merged automatically.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["keep", "drop", "reason"],
+        "properties": {
+          "keep": {"type": "string"},
+          "drop": {"type": "string"},
+          "reason": {"type": "string"},
+          "same_work": {"type": "boolean"}
+        }
+      }
+    },
+    "families": {
+      "type": "array",
+      "description": "Corrected document-family links (supplement-of, preprint-of, ...).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source_paper_id", "relation", "target_paper_id"],
+        "properties": {
+          "source_paper_id": {"type": "string"},
+          "target_paper_id": {"type": ["string", "null"]},
+          "relation": {"type": "string", "enum": ["supplement-of", "preprint-of", "version-of", "correction-of", "unrelated"]},
+          "reason": {"type": "string"}
+        }
+      }
+    },
+    "terminology": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "synonyms": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}},
+        "canonical": {"type": "object", "additionalProperties": {"type": "string"}}
+      }
+    }
+  }
+}
