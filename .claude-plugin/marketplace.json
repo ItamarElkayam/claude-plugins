@@ -1,5 +1,6 @@
 {
   "name": "paperbase-tools",
+  "description": "Research tooling for Claude Code: build durable, evidence-grounded knowledge bases from directories of scientific papers.",
   "owner": {
     "name": "Itamar Elkayam"
   },
@@ -9,7 +10,14 @@
       "source": "./plugins/paperbase",
       "description": "Turn a directory of scientific papers into a durable, incrementally maintainable knowledge base optimized for AI-agent context.",
       "version": "1.0.0",
-      "keywords": ["research", "literature", "pdf", "knowledge-base", "rag", "provenance"]
+      "keywords": [
+        "research",
+        "literature",
+        "pdf",
+        "knowledge-base",
+        "rag",
+        "provenance"
+      ]
     }
   ]
 }
