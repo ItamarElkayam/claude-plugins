@@ -230,22 +230,39 @@ _FTS_STOP = {
 }
 
 
+def _mentions(text_low: str, phrase: str) -> bool:
+    """Whole-word containment: the alias 'TP' must not fire on 'output'."""
+    phrase = (phrase or "").strip().lower()
+    if not phrase:
+        return False
+    pattern = r"(?<![A-Za-z0-9])%s(?![A-Za-z0-9])" % re.escape(phrase)
+    return re.search(pattern, text_low) is not None
+
+
 def expand_synonyms(conn: sqlite3.Connection, text: str, cfg: Dict[str, Any]) -> List[str]:
-    """Extra query terms from the corpus terminology map and config synonyms."""
+    """Extra query terms from the config synonyms and the corpus terminology map."""
     extra: List[str] = []
     low = text.lower()
     for term, aliases in (cfg["terminology"]["synonyms"] or {}).items():
-        if term.lower() in low:
-            extra.extend(aliases if isinstance(aliases, list) else [aliases])
+        alias_list = aliases if isinstance(aliases, list) else [aliases]
+        if _mentions(low, term):
+            extra.extend(alias_list)
         else:
-            for alias in (aliases if isinstance(aliases, list) else [aliases]):
-                if str(alias).lower() in low:
+            for alias in alias_list:
+                if _mentions(low, str(alias)):
                     extra.append(term)
+                    extra.extend([a for a in alias_list if str(a).lower() != str(alias).lower()])
+                    break
+    for acronym, expansion in (cfg["terminology"].get("acronyms") or {}).items():
+        if _mentions(low, acronym):
+            extra.append(expansion)
+        elif _mentions(low, expansion):
+            extra.append(acronym)
     try:
         for row in conn.execute("SELECT term, canonical, synonyms FROM terms"):
             names = [row["term"]] + [s.strip() for s in (row["synonyms"] or "").split("|") if s.strip()]
-            if any(n and n.lower() in low for n in names):
-                extra.extend([n for n in names if n and n.lower() not in low])
+            if any(n and _mentions(low, n) for n in names):
+                extra.extend([n for n in names if n and not _mentions(low, n)])
                 if row["canonical"]:
                     extra.append(row["canonical"])
     except sqlite3.Error:

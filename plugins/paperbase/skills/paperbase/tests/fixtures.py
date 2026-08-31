@@ -60,6 +60,9 @@ def _pdf_paper_a(path: str) -> None:
     page2.insert_textbox(fitz.Rect(60, 122, 540, 260), A["results"], fontsize=10)
     page2.insert_textbox(fitz.Rect(60, 280, 540, 298), A["caption"], fontsize=9)
     page2.insert_textbox(fitz.Rect(60, 302, 540, 340), A["table"], fontsize=9)
+    page2.insert_text((60, 356), "Widget calibration", fontsize=10)
+    page2.insert_textbox(fitz.Rect(60, 360, 540, 372),
+                         "Calibration used the vendor default profile.", fontsize=10)
     page2.insert_text((280, 800), "2", fontsize=8)
     page3 = doc.new_page()
     page3.insert_text((60, 70), "Widget Analysis", fontsize=9)
@@ -68,8 +71,12 @@ def _pdf_paper_a(path: str) -> None:
                          "Alpha shows that non-greedy search can reduce overcorrection on widget "
                          "reads without a speed penalty. Indel-aware correction remains future work.",
                          fontsize=10)
-    page3.insert_text((60, 260), "References", fontsize=13)
-    page3.insert_textbox(fitz.Rect(60, 270, 540, 360),
+    page3.insert_text((60, 240), "Author summary", fontsize=13)
+    page3.insert_textbox(fitz.Rect(60, 248, 540, 300),
+                         "We built a non-greedy corrector for widget reads and showed it makes "
+                         "fewer overcorrections than greedy tools on real data.", fontsize=10)
+    page3.insert_text((60, 330), "References", fontsize=13)
+    page3.insert_textbox(fitz.Rect(60, 340, 540, 430),
                          "1. Gamma G. Gamma: greedy widget correction. Widget J. 2016.\n"
                          "2. Delta D. On repeat-rich widgets. Widget J. 2017.", fontsize=9)
     page3.insert_text((280, 800), "3", fontsize=8)
@@ -101,12 +108,22 @@ def _pdf_paper_b(path: str, changed: bool = False) -> None:
                         "counted per base. Competing tools were run with default settings.",
                         fontsize=10)
     page.insert_text((60, 493), "2 Discussion", fontsize=13)
-    page.insert_textbox(fitz.Rect(60, 502, 540, 620),
+    page.insert_textbox(fitz.Rect(60, 502, 540, 600),
                         "Good results on simulated data may not translate to real data because "
                         "simulator error models can differ from real instruments. Low coverage "
-                        "was not evaluated.", fontsize=10)
-    page.insert_text((60, 663), "References", fontsize=13)
-    page.insert_textbox(fitz.Rect(60, 672, 540, 720),
+                        "was not evaluated. Corrections are decided from a multiple sequence "
+                        "alignment (MSA) of candidate reads; every MSA column is scored "
+                        "independently.", fontsize=10)
+    page.insert_text((60, 612), "Widget calibration", fontsize=10)
+    page.insert_textbox(fitz.Rect(60, 616, 540, 630),
+                        "Calibration followed the vendor default profile.", fontsize=10)
+    page.insert_text((60, 640), "Author summary", fontsize=13)
+    page.insert_textbox(fitz.Rect(60, 648, 540, 700),
+                        "We replaced hand-written correction rules with a learned classifier and "
+                        "measured far fewer false-positive corrections on simulated widget data.",
+                        fontsize=10)
+    page.insert_text((60, 715), "References", fontsize=13)
+    page.insert_textbox(fitz.Rect(60, 723, 540, 780),
                         "1. Alpha A. Alpha: a fast corrector for widget reads. Widget J. 2019.",
                         fontsize=9)
     doc.save(path)

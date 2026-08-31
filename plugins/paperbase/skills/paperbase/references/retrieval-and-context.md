@@ -21,9 +21,11 @@ identifiers survive (`SRR065390`, `BFC r181`, `F1`, `10.1093/bib/bbv029`); `--ra
 FTS5 expression through unchanged (`"k-mer" NEAR/5 spectrum`).
 
 Lexical-first is a deliberate choice: scientific questions turn on exact tool names,
-accessions, metrics and versions, which embeddings blur. Query expansion comes from
-`terminology.synonyms` in the config plus the corpus terminology map, so "overcorrection"
-also finds "false-positive correction".
+accessions, metrics and versions, which embeddings blur. Query expansion comes from the vocabulary mined at build time (acronym pairs, spelling
+variants), anything you add under `terminology.synonyms`, and the model-generated corpus
+terminology map — so `MSA` finds "multiple sequence alignment", `kmer` finds `k-mer`, and
+"overcorrection" finds "false-positive correction". Matching is whole-word, so a short alias
+like `TP` never fires inside "output".
 
 Filters (`kb search` and `kb context`): `--paper`, `--exclude-paper`, `--year`, `--type`,
 `--author`, `--method`, `--dataset`, `--concept`, `--claim-type`, `--min-confidence`,

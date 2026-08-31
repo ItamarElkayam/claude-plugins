@@ -64,12 +64,31 @@ metadata:
   family_title_similarity: 0.82
 
 terminology:
-  # Corpus-specific vocabulary. Synonyms are used to expand lexical queries and
-  # to seed the terminology map; add your field's aliases here.
+  # Corpus-specific vocabulary. `kb build` mines this automatically into
+  # <kb>/config/derived.yaml (see the `tuning` section); anything you set HERE wins
+  # over the mined values, and setting a key to {} or [] suppresses the mined one.
   synonyms: {}
   acronyms: {}
   priority_terms: []
   extra_stopwords: []
+
+tuning:
+  # Automatic corpus tuning: after parsing, paperbase mines this corpus's own
+  # vocabulary and writes it to <kb>/config/derived.yaml, which is layered UNDER
+  # your config.yaml. It never edits your file and never overrides your values.
+  enabled: true
+  mine_acronyms: true          # "multiple sequence alignment (MSA)" -> synonym pair
+  mine_orthographic_variants: true   # k-mer / kmer / k mer treated as one term
+  mine_priority_terms: true    # corpus-distinctive multi-word terms
+  max_priority_terms: 30
+  # Venue-specific section headings ("Author summary", "Key Points"). Adopting these
+  # changes how documents are segmented, so doing it re-parses the corpus once.
+  mine_section_headings: true
+  max_section_headings: 15
+  # A term/heading must appear in at least this many papers to be adopted.
+  min_papers: 2
+  # Minimum occurrences across the corpus for a term to be considered.
+  min_occurrences: 3
 
 retrieval:
   top_units: 40

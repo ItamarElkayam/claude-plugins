@@ -78,7 +78,7 @@ line and are refused rather than ignored.
 python3 tests/run_tests.py [-k <substring>] [-v] [--keep]
 ```
 
-22 tests, stdlib only, no network, no model calls. Fixtures are generated at runtime
+27 tests, stdlib only, no network, no model calls. Fixtures are generated at runtime
 (`tests/fixtures.py`): a three-page two-column PDF with headings, a table caption, running
 headers, printed folios and a reference list; a second PDF that disagrees with the first on
 different data; an **image-only PDF**; HTML with `citation_*` metadata plus script/nav
@@ -110,6 +110,13 @@ Coverage by layer:
   locator; a cross-paper disagreement query returns both sides, labels synthesis, discloses
   strategy and honours its budget; filters exclude other papers' passages and claims while
   disclosing that counterevidence is not filtered; the evaluation harness scores a real pack.
+- **setup + tuning** — `doctor` reports Python/FTS5/PDF-backend/OCR state; installs are
+  skipped when the corpus needs nothing and are opt-out-able with an actionable message;
+  acronyms, variants and vocabulary are mined from units (not reference lists); the human
+  config template is fully commented out so mined values apply, human values win, `{}`
+  suppresses, and typos are still rejected; a recurring body-size heading is adopted,
+  re-segments the corpus once, then settles with no oscillation, and a human veto reverses
+  it; mined acronyms expand queries in both directions without matching inside other words.
 - **robustness** — a failed write leaves the previous version intact and no temp files; an
   interrupted stage is reported by `validate`.
 

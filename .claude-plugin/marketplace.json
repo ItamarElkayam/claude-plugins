@@ -8,8 +8,8 @@
     {
       "name": "paperbase",
       "source": "./plugins/paperbase",
-      "description": "Turn a directory of scientific papers into a durable, incrementally maintainable knowledge base optimized for AI-agent context.",
-      "version": "1.0.0",
+      "description": "Turn a directory of scientific papers into a durable, incrementally maintainable knowledge base optimized for AI-agent context. Self-installing, self-tuning, provenance-checked.",
+      "version": "1.1.0",
       "keywords": [
         "research",
         "literature",

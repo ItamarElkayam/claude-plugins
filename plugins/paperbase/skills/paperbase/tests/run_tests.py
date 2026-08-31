@@ -29,10 +29,10 @@ sys.path.insert(0, os.path.join(SKILL, "scripts"))
 sys.path.insert(0, HERE)
 
 import fixtures  # noqa: E402
-from paperbase import (build as buildmod, config as cfgmod, context as ctxmod,  # noqa: E402
-                       evaluate, extract, fsutil, ids, indexdb, ingest, jsonschema_lite,
-                       locators, log, manifest, miniyaml, search, sentences, store,
-                       tasks, validate as validatemod)
+from paperbase import (bootstrap, build as buildmod, config as cfgmod,  # noqa: E402
+                       context as ctxmod, evaluate, extract, fsutil, ids, indexdb,
+                       ingest, jsonschema_lite, locators, log, manifest, miniyaml,
+                       search, sentences, store, tasks, tune, validate as validatemod)
 from paperbase.parsers import pdf_pymupdf  # noqa: E402
 
 TESTS = []
@@ -90,10 +90,14 @@ def t_miniyaml():
     doc = {"a": "line one\nline two", "b": "trailing\n", "c": [{"x": 1, "y": "two: three"}, "plain"],
            "d": None, "e": True, "f": 3.5, "g": "yes", "h": "", "i": [], "j": {}}
     eq(miniyaml.loads(miniyaml.dumps(doc)), doc, "round-trip")
+    eq(miniyaml.loads("a: [MSA, k-mer]\nb: {x: 1, y: two}\n"),
+       {"a": ["MSA", "k-mer"], "b": {"x": 1, "y": "two"}},
+       "plain (non-JSON) flow collections must parse - people write them in config files")
     fm, body = miniyaml.split_frontmatter("---\nname: x\n---\nbody\n")
     eq(fm["name"], "x", "frontmatter")
     ok(body.strip() == "body", "frontmatter body")
-    for bad, needle in (("a: 1\n\tb: 2\n", "tab"), ("key\n", "expected"), ("a: [1, 2\n", "JSON")):
+    for bad, needle in (("a: 1\n\tb: 2\n", "tab"), ("key\n", "expected"),
+                        ("a: [1, 2\n", "not closed"), ("b: {x: 1\n", "not closed")):
         try:
             miniyaml.loads(bad)
             raise AssertionError("should have failed: %r" % bad)
@@ -687,6 +691,150 @@ def t_work_orders():
     ok(payload["input"]["units"], "machine-readable units must accompany the order")
     eq(payload["prompt_version"], cfgmod.prompt_version("paper_analysis.md"), "prompt version recorded")
     ok(order["response_path"].endswith("%s.response.json" % pid), "response path must be explicit")
+
+
+
+
+# ------------------------------------------------------------------ setup + tuning
+@test("setup: doctor reports the environment and installs only what the corpus needs")
+def t_doctor():
+    report = bootstrap.doctor(needed_capabilities=[])
+    ok(report["python_ok"], "python version check")
+    ok(report["sqlite"]["fts5"], "FTS5 must be available for search to work")
+    ok(bootstrap.libdir().endswith(os.path.join("paperbase", "pylibs")),
+       "installs must target a private dir, got %s" % bootstrap.libdir())
+    ok("pdftoppm" in report["optional_tools"], "optional OCR tools must be reported")
+    text = bootstrap.format_report(report)
+    ok("private libdir" in text and "auto-install" in text, "report must be legible")
+
+    # a corpus with no PDFs must not trigger any install
+    eq(bootstrap.ensure_for_corpus([".md", ".txt"])["needed"], [], "no PDFs -> no install")
+    eq(bootstrap.ensure_for_corpus([".pdf"])["needed"], ["pdf"], "PDFs -> pdf capability")
+
+    # opt-out must be honoured and must explain how to proceed by hand
+    old = os.environ.get("PAPERBASE_NO_INSTALL")
+    os.environ["PAPERBASE_NO_INSTALL"] = "1"
+    try:
+        ok(not bootstrap.installs_allowed(), "PAPERBASE_NO_INSTALL must disable installs")
+    finally:
+        if old is None:
+            del os.environ["PAPERBASE_NO_INSTALL"]
+        else:
+            os.environ["PAPERBASE_NO_INSTALL"] = old
+    ok(not bootstrap.installs_allowed(no_install=True), "--no-install must disable installs")
+    # when a capability is missing AND installs are off, the message must be actionable
+    saved = bootstrap.REQUIREMENTS.get("_probe")
+    bootstrap.REQUIREMENTS["_probe"] = [
+        {"module": "definitely_not_installed_xyz", "spec": "definitely-not-installed-xyz",
+         "why": "test"}]
+    try:
+        outcome = bootstrap.ensure("_probe", no_install=True)
+        eq(outcome["satisfied_by"], None, "unavailable capability")
+        joined = " ".join(outcome["actions"])
+        ok("pip install" in joined and "--target" in joined,
+           "must tell the user the exact command: %s" % joined)
+    finally:
+        if saved is None:
+            bootstrap.REQUIREMENTS.pop("_probe", None)
+        else:
+            bootstrap.REQUIREMENTS["_probe"] = saved
+
+
+@test("tuning: the corpus's own vocabulary is mined automatically")
+def t_tuning_mining():
+    CTX.build(force_fresh=True)
+    mined = fsutil.read_json(os.path.join(CTX.kb, "reports", "tuning_report.json"), {})
+    ok(mined, "a tuning report must be written on build")
+    ok("MSA" in mined["acronyms"], "the acronym defined in the corpus must be mined: %s"
+       % sorted(mined["acronyms"]))
+    eq(mined["acronyms"]["MSA"]["expansion"], "multiple sequence alignment", "expansion")
+    terms = [t["term"] for t in mined["priority_terms"]]
+    ok(terms, "corpus vocabulary must not be empty")
+    ok(all(len(t.split()) >= 2 for t in terms), "priority terms are multi-word: %s" % terms)
+    # mining reads retrieval units, so reference-list text must not become vocabulary
+    ok(not any("widget j" in t for t in terms), "reference-list text leaked into vocabulary: %s" % terms)
+    cfg = cfgmod.load(CTX.kb)
+    eq(cfg["terminology"]["acronyms"].get("MSA"), "multiple sequence alignment",
+       "mined acronym must reach the effective config")
+    index = fsutil.read_text(os.path.join(CTX.kb, "KB_INDEX.md"))
+    ok("Corpus vocabulary" in index, "the KB index must surface the mined vocabulary")
+
+
+@test("tuning: derived config is layered under the human config, which always wins")
+def t_config_layering():
+    CTX.build(force_fresh=True)
+    human_path = cfgmod.kb_config_path(CTX.kb)
+    ok(os.path.exists(human_path), "a config template must be installed")
+    eq(miniyaml.load(human_path), None,
+       "the installed template must be fully commented out, or it would pin every default "
+       "and silently defeat automatic tuning")
+    cfg = cfgmod.load(CTX.kb)
+    eq(cfg["units"]["max_chars"], 1500, "defaults still apply")
+    ok(cfg["terminology"]["synonyms"], "mined synonyms apply when the human is silent")
+    with open(human_path, "a", encoding="utf-8") as fh:
+        fh.write("\nterminology:\n  synonyms: {}\nunits:\n  max_chars: 900\n")
+    cfg = cfgmod.load(CTX.kb)
+    eq(cfg["units"]["max_chars"], 900, "human value must win over the default")
+    eq(cfg["terminology"]["synonyms"], {}, "human {} must suppress the mined value")
+    with open(human_path, "a", encoding="utf-8") as fh:
+        fh.write("\nparsing:\n  colum_min_blocks: 3\n")
+    try:
+        cfgmod.load(CTX.kb)
+        raise AssertionError("a typo in the human config must be rejected")
+    except SystemExit as exc:
+        ok("colum_min_blocks" in str(exc), "the error must name the offending key")
+
+
+@test("tuning: a recurring body-size heading is adopted, re-segments once, then settles")
+def t_heading_adoption():
+    CTX.build(force_fresh=True)
+    cfg = cfgmod.load(CTX.kb)
+    eq(cfg["parsing"]["extra_section_headings"], ["Widget calibration"],
+       "a heading recurring across papers at body font size must be adopted")
+    pid = CTX.pid("alpha_2019.pdf")
+    ok("Widget calibration" in store.read_parse(CTX.kb, pid)["sections"],
+       "the corpus must be re-segmented so the adopted heading starts a section")
+
+    second = buildmod.build(CTX.papers, CTX.kb)
+    eq(second["reparsed"], [], "the second build must not re-parse again (no oscillation)")
+    derived_before = fsutil.read_text(cfgmod.derived_path(CTX.kb))
+    third = buildmod.build(CTX.papers, CTX.kb)
+    eq(third["reparsed"], [], "and neither must the third")
+    eq(fsutil.read_text(cfgmod.derived_path(CTX.kb)), derived_before,
+       "derived config must be stable across updates")
+
+    # a human veto reverses the adoption
+    with open(cfgmod.kb_config_path(CTX.kb), "a", encoding="utf-8") as fh:
+        fh.write("\nparsing:\n  extra_section_headings: []\n")
+    buildmod.build(CTX.papers, CTX.kb)
+    ok("Widget calibration" not in store.read_parse(CTX.kb, pid)["sections"],
+       "setting extra_section_headings: [] must undo the adoption")
+    CTX.built = False  # this KB now carries a human override; rebuild for later tests
+
+
+@test("retrieval: mined acronyms expand queries in both directions")
+def t_synonym_expansion():
+    CTX.build(force_fresh=True)
+    cfg = cfgmod.load(CTX.kb)
+    conn = indexdb.connect(CTX.kb, create=False)
+    try:
+        expanded = indexdb.expand_synonyms(conn, "how is the MSA scored?", cfg)
+        ok(any("multiple sequence alignment" in e for e in expanded),
+           "querying the acronym must add the expansion: %s" % expanded)
+        expanded = indexdb.expand_synonyms(conn, "multiple sequence alignment consensus", cfg)
+        ok("MSA" in expanded, "querying the expansion must add the acronym: %s" % expanded)
+        # word-boundary matching: a short alias must not fire inside another word
+        cfg2 = dict(cfg)
+        cfg2["terminology"] = dict(cfg["terminology"],
+                                   synonyms={"true positive": ["TP"]}, acronyms={"TP": "true positive"})
+        eq(indexdb.expand_synonyms(conn, "the output of the pipeline", cfg2), [],
+           "alias 'TP' must not match inside 'output'")
+        ok(indexdb.expand_synonyms(conn, "TP and FP counts", cfg2), "but must match as a word")
+        rows = search.search_units(conn, indexdb.fts_query("MSA") + ' OR "multiple sequence alignment"',
+                                   5, search.Filters())
+        ok(rows, "expansion must actually retrieve the passage that spells the term out")
+    finally:
+        conn.close()
 
 
 # ------------------------------------------------------------------ helpers

@@ -19,10 +19,21 @@ def load_defaults() -> Dict[str, Any]:
     return miniyaml.load(DEFAULTS_PATH)
 
 
+# Paths whose keys are DATA, not schema: users and the tuner invent the keys, so the
+# unknown-key guard must not recurse into them.
+FREEFORM_PATHS = frozenset(["terminology.synonyms", "terminology.acronyms"])
+
+
 def _deep_merge(base: Dict[str, Any], over: Dict[str, Any], path: str = "") -> Dict[str, Any]:
     out = dict(base)
     for key, value in (over or {}).items():
         where = "%s.%s" % (path, key) if path else key
+        if where in FREEFORM_PATHS:
+            if not isinstance(value, dict):
+                raise ValueError("config key %r must be a mapping, got %s"
+                                 % (where, type(value).__name__))
+            out[key] = dict(value)
+            continue
         if key not in base:
             raise ValueError(
                 "unknown config key %r (see %s for the documented key set)" % (where, DEFAULTS_PATH)
@@ -35,28 +46,77 @@ def _deep_merge(base: Dict[str, Any], over: Dict[str, Any], path: str = "") -> D
 
 
 def kb_config_path(kb_dir: str) -> str:
+    """The human-edited config: authoritative, never written by paperbase."""
     return os.path.join(kb_dir, "config", "config.yaml")
 
 
+def derived_path(kb_dir: str) -> str:
+    """Machine-mined config (see tune.py): layered UNDER the human config."""
+    return os.path.join(kb_dir, "config", "derived.yaml")
+
+
 def load(kb_dir: str = None) -> Dict[str, Any]:
-    """Defaults, overlaid by <kb>/config/config.yaml when present."""
+    """Effective config: defaults <- derived.yaml (mined) <- config.yaml (human).
+
+    The human file is applied last, so a hand-set value can never be overwritten by
+    automatic tuning, and setting a key to [] or {} there suppresses the mined value.
+    """
     cfg = load_defaults()
-    if kb_dir:
-        path = kb_config_path(kb_dir)
-        if os.path.exists(path):
-            cfg = _deep_merge(cfg, miniyaml.load(path) or {})
+    if not kb_dir:
+        return cfg
+    for path, label in ((derived_path(kb_dir), "derived"), (kb_config_path(kb_dir), "config")):
+        if not os.path.exists(path):
+            continue
+        try:
+            overlay = miniyaml.load(path) or {}
+        except Exception as exc:
+            raise SystemExit("%s is not readable (%s). Fix or delete it; paperbase will not "
+                             "guess what you meant." % (path, exc))
+        try:
+            cfg = _deep_merge(cfg, overlay)
+        except ValueError as exc:
+            raise SystemExit("%s: %s" % (path, exc))
     return cfg
 
 
+TEMPLATE_HEADER = """# paperbase configuration for THIS knowledge base.
+#
+# Every setting below is commented out and shows the built-in default. Uncomment only
+# what you want to change - including the parent key, e.g.
+#
+#   units:
+#     max_chars: 2000
+#
+# Why commented: values you set here override BOTH the built-in defaults and the
+# vocabulary mined automatically into config/derived.yaml. A key left commented lets the
+# mined value apply; setting it to [] or {} suppresses the mined value entirely.
+#
+# Unknown keys are rejected by name, so a typo fails loudly instead of doing nothing.
+# ---------------------------------------------------------------------------------
+"""
+
+
 def install(kb_dir: str) -> str:
-    """Write the editable per-KB config copy if it does not exist yet."""
+    """Write the per-KB config as a fully commented template, once.
+
+    A full uncommented copy would pin every key to its default and so silently
+    override the automatically mined vocabulary in derived.yaml.
+    """
     path = kb_config_path(kb_dir)
-    if not os.path.exists(path):
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(DEFAULTS_PATH, "r", encoding="utf-8") as src:
-            body = src.read()
-        with open(path, "w", encoding="utf-8") as dst:
-            dst.write(body)
+    if os.path.exists(path):
+        return path
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(DEFAULTS_PATH, "r", encoding="utf-8") as src:
+        lines = src.read().split("\n")
+    body = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            body.append(line)
+        else:
+            body.append("# " + line)
+    with open(path, "w", encoding="utf-8") as dst:
+        dst.write(TEMPLATE_HEADER + "\n".join(body))
     return path
 
 

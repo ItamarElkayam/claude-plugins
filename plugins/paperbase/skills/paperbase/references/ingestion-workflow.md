@@ -1,5 +1,69 @@
 # Ingestion and incremental update
 
+## First-run setup
+
+### Dependencies
+
+`kb build` checks what the corpus actually needs before parsing: a directory of Markdown
+and HTML never triggers an install, a directory containing PDFs does. When a needed backend
+is missing it is installed with
+
+```
+python3 -m pip install --target ~/.cache/paperbase/pylibs 'pymupdf>=1.23,<2'
+```
+
+- **private by construction**: `--target` keeps it out of system and user site-packages, so
+  nothing else on the machine changes and no sudo or virtualenv is required (this is also
+  why externally-managed Pythons, e.g. Homebrew or Debian, are unaffected);
+- the directory is put on `sys.path` by `paperbase/__init__.py`, and adapters import their
+  backend lazily so an install that happens mid-run takes effect immediately;
+- overridable location: `PAPERBASE_HOME`; removable with `rm -rf ~/.cache/paperbase`;
+- announced on stderr and recorded in `state/audit.jsonl` as `dependency_installed`;
+- opt out with `--no-install` or `PAPERBASE_NO_INSTALL=1` - you then get the exact command
+  to run by hand, and the pipeline continues with whatever capability remains.
+
+`kb doctor [<kb>]` prints the whole picture without building: Python version, sqlite
+version and whether FTS5 is compiled in (without it, search cannot run), the PDF backend in
+use, the private library directory, and the optional OCR tools. Exit code 2 means something
+required is missing. Given a KB path it only checks what that corpus needs.
+
+### Corpus tuning
+
+Hand-tuning terminology is the step everyone skips, so it is automatic. After parsing,
+`kb build` mines the corpus and writes `config/derived.yaml`:
+
+| Mined | How | Used for |
+|---|---|---|
+| acronyms | `expansion words (ACRO)` where the letters are the initials - a compact Schwartz-Hearst match, high precision | bidirectional query expansion (`MSA` ↔ `multiple sequence alignment`) |
+| spelling variants | surface forms differing only in hyphens/spaces/case (`k-mer`, `kmer`) | query expansion |
+| corpus vocabulary | 2-3 word phrases frequent **and** spread across papers | `KB_INDEX.md` orientation, `terminology.priority_terms` |
+| venue section headings | short title-like blocks recurring across papers that the font/numbering heuristics missed ("Author summary") | segmentation |
+
+Mining reads the **retrieval units**, not the raw text, so reference-list journal names
+never become corpus vocabulary and what is mined matches what search actually sees.
+
+Adopting a section heading changes segmentation, so `kb build` re-parses the corpus **once**
+and says so. Adoption is monotonic: an adopted heading is then parsed as a heading and would
+otherwise vanish from the candidate pool on the next run, flip-flopping the segmentation, so
+the derived list only ever grows. Nothing else in tuning triggers a re-parse.
+
+Inspect with `kb tune <kb> --show` (writes nothing) or `reports/tuning_report.md`.
+Re-mine with `kb tune <kb>`. Disable with `--no-tune`, or per-feature under `tuning:` in
+your config.
+
+### Configuration layering
+
+```
+config/defaults.yaml (shipped)  <-  <kb>/config/derived.yaml (mined)  <-  <kb>/config/config.yaml (yours)
+```
+
+Your file is applied last and **starts fully commented out**. That matters: a full
+uncommented copy would pin every key to its default and silently override everything mined.
+So an untouched KB uses defaults + mined values; uncommenting a key takes control of it; and
+setting a key to `[]` or `{}` suppresses the mined value for that key alone. Unknown keys are
+rejected by name in both files - `terminology.synonyms` and `terminology.acronyms` are
+free-form maps whose keys are data, not schema.
+
 ## `kb build` / `kb update`
 
 Both run the same code path; `build` is `update` against an empty KB.
@@ -36,9 +100,10 @@ Driven by **content hashes**, never mtimes:
 | identity basis changed by a re-parse | old id tombstoned, new id created, change reported |
 | parser/prompt/model/schema/config/pipeline version changed | affected stages go stale automatically |
 
-The per-KB `config/config.yaml` is authoritative for that corpus, so changing the skill's
-`config/defaults.yaml` does **not** silently mutate existing KBs. Edit the KB's copy to
-adopt new settings — the config hash changes and the affected stages re-run.
+The per-KB config is authoritative for that corpus: changing the skill's shipped
+`config/defaults.yaml` affects only keys the KB has not pinned. Uncomment a key in
+`<kb>/config/config.yaml` to take control of it — the config hash changes and the affected
+stages re-run.
 
 ## Parser adapters
 
@@ -117,8 +182,11 @@ wins over the heuristic and survives every rebuild.
 first build. Unknown keys are rejected by name — a typo never silently does nothing. The
 corpus-specific parts worth setting early:
 
-- `terminology.synonyms` / `acronyms` / `priority_terms` — drives query expansion;
-- `parsing.extra_section_headings` — section names peculiar to your venue;
+- `terminology.synonyms` / `acronyms` / `priority_terms` — drives query expansion; **mined
+  automatically**, so set these only to correct or extend what tuning found;
+- `parsing.extra_section_headings` — section names peculiar to your venue; also mined
+  automatically (set to `[]` to veto);
+- `tuning.*` — switch individual miners off, or raise `min_papers` on a large corpus;
 - `units.max_chars` / `min_chars` — retrieval granularity;
 - `analysis.model_id` — recorded in provenance so a model change invalidates analyses;
 - `retrieval.*` — pack sizes, per-paper diversity cap, counterevidence share;

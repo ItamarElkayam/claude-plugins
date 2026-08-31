@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """paperbase CLI - build and query a scientific-literature knowledge base.
 
-    kb build <paper-dir> <kb-dir>        parse, normalize, index (no model calls)
+    kb doctor [<kb-dir>]                 check the environment; install what is needed
+    kb build <paper-dir> <kb-dir>        parse, normalize, tune, index (no model calls)
     kb update <paper-dir> <kb-dir>       incremental: only what changed
     kb status <kb-dir>                   what exists, what is stale, what is pending
     kb tasks <kb-dir> --stage <stage>    emit work orders for model-dependent stages
@@ -10,6 +11,7 @@
     kb context <kb-dir> "<question>"     compact evidence pack for another agent
     kb show-paper <kb-dir> <paper_id>    one paper's profile, claims, relations
     kb show-claim <kb-dir> <claim_id>    one claim with its exact source passage
+    kb tune <kb-dir>                     re-mine corpus vocabulary and section headings
     kb validate <kb-dir>                 schema + provenance + link validation
     kb reindex <kb-dir>                  rebuild the derived SQLite index
     kb eval <kb-dir> [questions.yaml]    run retrieval evaluation questions
@@ -25,11 +27,11 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from paperbase import (PIPELINE_VERSION, SCHEMA_VERSION, build as buildmod,
+from paperbase import (PIPELINE_VERSION, SCHEMA_VERSION, bootstrap, build as buildmod,
                        config as cfgmod, context as ctxmod, evaluate, fsutil,
                        indexdb, ingest as ingestmod, locators, log, manifest,
                        render, search as searchmod, store, tasks as tasksmod,
-                       validate as validatemod)
+                       tune as tunemod, validate as validatemod)
 
 
 def _add_common(parser: argparse.ArgumentParser) -> None:
@@ -52,15 +54,55 @@ def _filters_from_args(args) -> searchmod.Filters:
 # ---------------------------------------------------------------- commands
 def cmd_build(args) -> int:
     report = buildmod.build(args.paper_dir, args.kb_dir, force=args.force,
-                            copy_sources=True if args.copy_sources else None)
+                            copy_sources=True if args.copy_sources else None,
+                            no_install=args.no_install, no_tune=args.no_tune)
     _print_build(report)
     return 0
 
 
 def cmd_update(args) -> int:
     report = buildmod.build(args.paper_dir or _paper_dir(args.kb_dir), args.kb_dir,
-                            force=args.force)
+                            force=args.force, no_install=args.no_install,
+                            no_tune=args.no_tune)
     _print_build(report)
+    return 0
+
+
+def cmd_doctor(args) -> int:
+    needed = None
+    if args.kb_dir:
+        man = manifest.load(args.kb_dir)
+        if man:
+            exts = sorted({os.path.splitext(e.get("source_path") or "")[1].lower()
+                           for e in man["papers"].values()})
+            needed = ["pdf"] if any(e == ".pdf" for e in exts) else []
+    report = bootstrap.doctor(needed_capabilities=needed, no_install=args.no_install)
+    if args.json:
+        print(json.dumps(report, indent=2, sort_keys=True))
+    else:
+        print(bootstrap.format_report(report))
+    missing = [c for c, o in report["capabilities"].items() if not o["satisfied_by"]]
+    return 2 if (missing or not report["python_ok"] or not report["sqlite"].get("fts5")) else 0
+
+
+def cmd_tune(args) -> int:
+    kb_dir = args.kb_dir
+    cfg = cfgmod.load(kb_dir)
+    man = manifest.load(kb_dir)
+    if man is None:
+        raise SystemExit("no KB at %s - run `kb build` first" % kb_dir)
+    mined = tunemod.mine(kb_dir, cfg, manifest.active_papers(man))
+    if args.show:
+        print(json.dumps(mined, indent=2, sort_keys=True, default=str))
+        return 0
+    path, parsing_changed, _ = tunemod.write_derived(kb_dir, mined)
+    report_path = tunemod.report(kb_dir, mined, parsing_changed)
+    log.info("mined %d acronym(s), %d variant group(s), %d term(s), %d heading(s)",
+             len(mined["acronyms"]), len(mined["variants"]), len(mined["priority_terms"]),
+             len(mined["section_headings"]))
+    log.info("wrote %s and %s", os.path.relpath(path, kb_dir), os.path.relpath(report_path, kb_dir))
+    if parsing_changed:
+        log.info("section headings changed: run `kb update %s` to re-segment the corpus", kb_dir)
     return 0
 
 
@@ -395,6 +437,10 @@ def main(argv=None) -> int:
     p.add_argument("--force", action="store_true", help="re-parse everything, ignoring fingerprints")
     p.add_argument("--copy-sources", action="store_true",
                    help="also copy source documents into <kb>/sources/ (originals untouched)")
+    p.add_argument("--no-install", action="store_true",
+                   help="never install dependencies automatically (also PAPERBASE_NO_INSTALL=1)")
+    p.add_argument("--no-tune", action="store_true",
+                   help="skip automatic corpus vocabulary tuning")
     _add_common(p)
     p.set_defaults(func=cmd_build)
 
@@ -402,6 +448,8 @@ def main(argv=None) -> int:
     p.add_argument("kb_dir")
     p.add_argument("paper_dir", nargs="?", help="defaults to the directory recorded in the manifest")
     p.add_argument("--force", action="store_true")
+    p.add_argument("--no-install", action="store_true")
+    p.add_argument("--no-tune", action="store_true")
     _add_common(p)
     p.set_defaults(func=cmd_update)
 
@@ -484,6 +532,19 @@ def main(argv=None) -> int:
     p.add_argument("kb_dir")
     _add_common(p)
     p.set_defaults(func=cmd_reindex)
+
+    p = sub.add_parser("doctor", help="check the environment and install what the corpus needs")
+    p.add_argument("kb_dir", nargs="?", help="limit the check to what this KB actually needs")
+    p.add_argument("--no-install", action="store_true")
+    p.add_argument("--json", action="store_true")
+    _add_common(p)
+    p.set_defaults(func=cmd_doctor)
+
+    p = sub.add_parser("tune", help="re-mine this corpus's vocabulary into config/derived.yaml")
+    p.add_argument("kb_dir")
+    p.add_argument("--show", action="store_true", help="print what would be mined, write nothing")
+    _add_common(p)
+    p.set_defaults(func=cmd_tune)
 
     p = sub.add_parser("eval", help="run retrieval evaluation questions")
     p.add_argument("kb_dir")

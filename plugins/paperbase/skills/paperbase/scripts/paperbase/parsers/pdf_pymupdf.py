@@ -11,19 +11,26 @@ import os
 from typing import Any, Dict, List
 
 NAME = "pymupdf"
-try:  # pragma: no cover - import guard
-    import fitz  # type: ignore
+fitz = None
+VERSION = "pymupdf-unavailable"
 
+
+def _load() -> bool:
+    """Import PyMuPDF on demand (a first-run install can land after startup)."""
+    global fitz, VERSION
+    if fitz is not None:
+        return True
+    try:
+        import fitz as _fitz  # type: ignore
+    except Exception:
+        return False
+    fitz = _fitz
     VERSION = "pymupdf-%s" % (getattr(fitz, "__version__", None) or getattr(fitz, "VersionBind", "?"))
-    _OK = True
-except Exception:  # pragma: no cover
-    fitz = None
-    VERSION = "pymupdf-unavailable"
-    _OK = False
+    return True
 
 
 def available() -> bool:
-    return _OK
+    return _load()
 
 
 def can_handle(path: str) -> bool:
@@ -42,6 +49,8 @@ def _page_label(doc, page, index: int) -> str:
 
 
 def parse(path: str, cfg: Dict[str, Any]) -> Dict[str, Any]:
+    if not _load():
+        raise RuntimeError("PyMuPDF is not importable")
     warnings: List[str] = []
     blocks: List[Dict[str, Any]] = []
     pages_text: List[str] = []

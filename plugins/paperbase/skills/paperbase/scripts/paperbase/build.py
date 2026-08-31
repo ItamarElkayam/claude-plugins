@@ -17,11 +17,13 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-from . import (config as cfgmod, extract, fsutil, ids, indexdb, log, manifest,
-               metadata as metamod, overrides as ovmod, parsers, render, scan, store)
+from . import (bootstrap, config as cfgmod, extract, fsutil, ids, indexdb, log,
+               manifest, metadata as metamod, overrides as ovmod, parsers, render,
+               scan, store, tune)
 
 
 def _parse_document(path: str, cfg: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
@@ -78,7 +80,8 @@ def _paper_record(pid: str, basis: str, key: str, doc_meta: Dict[str, Any], entr
 
 
 def build(paper_dir: str, kb_dir: str, force: bool = False, copy_sources: Optional[bool] = None,
-          reindex_only: bool = False) -> Dict[str, Any]:
+          reindex_only: bool = False, no_install: bool = False, no_tune: bool = False,
+          _after_tuning: bool = False) -> Dict[str, Any]:
     started = time.time()
     paper_dir = os.path.abspath(os.path.expanduser(paper_dir))
     kb_dir = os.path.abspath(os.path.expanduser(kb_dir))
@@ -102,6 +105,21 @@ def build(paper_dir: str, kb_dir: str, force: bool = False, copy_sources: Option
     is_new = not man["papers"]
 
     scanned = scan.scan(paper_dir, cfg)
+    if not _after_tuning:
+        setup = bootstrap.ensure_for_corpus(
+            sorted({d["ext"] for d in scanned["documents"]}), no_install=no_install)
+        for capability, outcome in (setup.get("capabilities") or {}).items():
+            if outcome["installed"]:
+                log.audit(kb_dir, "dependency_installed", capability=capability,
+                          packages=outcome["installed"], target=bootstrap.libdir())
+            for action in outcome["actions"]:
+                log.warn("%s", action)
+        man["environment"] = {
+            "python": sys.version.split()[0],
+            "capabilities": {c: o["satisfied_by"]
+                             for c, o in (setup.get("capabilities") or {}).items()},
+            "private_libdir": bootstrap.libdir(),
+        }
     man["archives"] = scanned["archives"]
     man["unsupported"] = scanned["unsupported"]
 
@@ -243,6 +261,45 @@ def build(paper_dir: str, kb_dir: str, force: bool = False, copy_sources: Option
     for pid in seen_ids:
         man["papers"][pid].update({k: v for k, v in records[pid].items() if k != "stages"})
         man["papers"][pid]["status"] = "active"
+
+    # ---------------------------------------------------------------- tuning
+    tuning_state: Dict[str, Any] = {"ran": False, "reparsed_for_headings": False}
+    if cfg["tuning"]["enabled"] and not no_tune and not reindex_only:
+        expected_tuning = manifest.corpus_fingerprint("tuning", cfg, man)
+        if force or manifest.corpus_stale(man, "tuning", expected_tuning):
+            active_now = manifest.active_papers(man)
+            mined = tune.mine(kb_dir, cfg, active_now)
+            path, parsing_changed, _prev = tune.write_derived(kb_dir, mined)
+            report_path = tune.report(kb_dir, mined, parsing_changed)
+            tuning_state = {
+                "ran": True, "derived_config": path, "report": report_path,
+                "acronyms": len(mined["acronyms"]), "variants": len(mined["variants"]),
+                "priority_terms": len(mined["priority_terms"]),
+                "section_headings": [h["heading"] for h in mined["section_headings"]],
+                "reparsed_for_headings": False,
+            }
+            report["stages_run"].append("tuning")
+            log.audit(kb_dir, "tuning", **{k: v for k, v in tuning_state.items()
+                                           if k in ("acronyms", "variants", "priority_terms")})
+            cfg = cfgmod.load(kb_dir)  # pick up derived.yaml
+            manifest.record_corpus_stage(
+                man, "tuning", manifest.corpus_fingerprint("tuning", cfg, man), [path, report_path],
+                n_acronyms=len(mined["acronyms"]), n_terms=len(mined["priority_terms"]))
+            manifest.save(kb_dir, man)
+            if parsing_changed and not _after_tuning:
+                # Adopting corpus-specific section headings changes segmentation, so the
+                # corpus is re-parsed exactly once; the new parsing config makes every
+                # parse fingerprint stale, which is what drives the re-parse.
+                log.info("adopted %d corpus-specific section heading(s); re-parsing once so "
+                         "section paths reflect them", len(mined["section_headings"]))
+                second = build(paper_dir, kb_dir, force=False, copy_sources=copy_sources,
+                               no_install=True, no_tune=True, _after_tuning=True)
+                second["tuning"] = dict(tuning_state, reparsed_for_headings=True)
+                second["mode"] = report["mode"]
+                second["elapsed_s"] = round(time.time() - started, 2)
+                render.write_update_report(kb_dir, second)
+                return second
+    report["tuning"] = tuning_state
 
     # ---------------------------------------------------------------- overrides
     ov, ov_problems = ovmod.load(kb_dir)

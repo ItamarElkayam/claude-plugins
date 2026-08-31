@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 __all__ = ["YamlError", "loads", "load", "dumps", "dump", "split_frontmatter"]
 
@@ -58,16 +58,62 @@ def _strip_comment(line: str) -> str:
     return "".join(out).rstrip()
 
 
+def _split_flow(body: str, lineno: int) -> List[str]:
+    """Split a flow collection body on top-level commas, respecting nesting/quotes."""
+    parts: List[str] = []
+    depth = 0
+    quote = None
+    current: List[str] = []
+    for ch in body:
+        if quote:
+            current.append(ch)
+            if ch == quote:
+                quote = None
+            continue
+        if ch in "'\"":
+            quote = ch
+            current.append(ch)
+        elif ch in "[{":
+            depth += 1
+            current.append(ch)
+        elif ch in "]}":
+            depth -= 1
+            if depth < 0:
+                raise YamlError("line %d: unbalanced flow collection" % lineno)
+            current.append(ch)
+        elif ch == "," and depth == 0:
+            parts.append("".join(current))
+            current = []
+        else:
+            current.append(ch)
+    if quote:
+        raise YamlError("line %d: unterminated quote in flow collection" % lineno)
+    if depth != 0:
+        raise YamlError("line %d: unbalanced flow collection" % lineno)
+    parts.append("".join(current))
+    return [p for p in parts if p.strip() != ""]
+
+
+def _parse_flow(text: str, lineno: int) -> Any:
+    """Flow sequence/mapping with unquoted scalars allowed: [a, b] and {a: 1, b: two}."""
+    s = text.strip()
+    if s.startswith("["):
+        if not s.endswith("]"):
+            raise YamlError("line %d: flow sequence is not closed: %s" % (lineno, s[:60]))
+        return [_scalar(item, lineno) for item in _split_flow(s[1:-1], lineno)]
+    if not s.endswith("}"):
+        raise YamlError("line %d: flow mapping is not closed: %s" % (lineno, s[:60]))
+    out: Dict[str, Any] = {}
+    for item in _split_flow(s[1:-1], lineno):
+        key, value = _split_key(item.strip(), lineno)
+        out[key] = _scalar(value, lineno)
+    return out
+
+
 def _scalar(raw: str, lineno: int) -> Any:
     s = raw.strip()
     if s.startswith("[") or s.startswith("{"):
-        try:
-            return json.loads(s)
-        except Exception as exc:  # pragma: no cover - message path
-            raise YamlError(
-                "line %d: flow collection must be JSON-compatible (%s): %s"
-                % (lineno, exc, s)
-            )
+        return _parse_flow(s, lineno)
     if len(s) >= 2 and s[0] == s[-1] and s[0] in "'\"":
         body = s[1:-1]
         if s[0] == '"':

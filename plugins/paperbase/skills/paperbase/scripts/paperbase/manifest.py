@@ -30,7 +30,7 @@ from typing import Any, Dict, Iterable, List, Optional
 from . import PIPELINE_VERSION, SCHEMA_VERSION, config as cfgmod, fsutil
 
 PAPER_STAGES = ("parse", "units", "metadata", "profile", "claims")
-CORPUS_STAGES = ("families", "relations", "topics", "overview", "index")
+CORPUS_STAGES = ("tuning", "families", "relations", "topics", "overview", "index")
 MODEL_STAGES = ("profile", "claims", "relations", "topics", "overview")
 
 _PROMPT_FOR_STAGE = {
@@ -117,7 +117,10 @@ def corpus_fingerprint(stage: str, cfg: Dict[str, Any], man: Dict[str, Any]) -> 
         }
 
     payload: Dict[str, Any] = {"stage": stage, "pipeline": PIPELINE_VERSION, "schema": SCHEMA_VERSION}
-    if stage == "families":
+    if stage == "tuning":
+        payload["inputs"] = stage_fps("units")
+        payload["cfg"] = cfg["tuning"]
+    elif stage == "families":
         payload["inputs"] = stage_fps("metadata")
         payload["cfg"] = cfg["metadata"]
     elif stage == "relations":

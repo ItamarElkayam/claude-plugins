@@ -10,19 +10,25 @@ import os
 from typing import Any, Dict, List
 
 NAME = "pypdf"
-try:  # pragma: no cover
-    import pypdf  # type: ignore
+pypdf = None
+VERSION = "pypdf-unavailable"
 
+
+def _load() -> bool:
+    global pypdf, VERSION
+    if pypdf is not None:
+        return True
+    try:
+        import pypdf as _pypdf  # type: ignore
+    except Exception:
+        return False
+    pypdf = _pypdf
     VERSION = "pypdf-%s" % getattr(pypdf, "__version__", "?")
-    _OK = True
-except Exception:  # pragma: no cover
-    pypdf = None
-    VERSION = "pypdf-unavailable"
-    _OK = False
+    return True
 
 
 def available() -> bool:
-    return _OK
+    return _load()
 
 
 def can_handle(path: str) -> bool:
@@ -30,6 +36,8 @@ def can_handle(path: str) -> bool:
 
 
 def parse(path: str, cfg: Dict[str, Any]) -> Dict[str, Any]:
+    if not _load():
+        raise RuntimeError("pypdf is not importable")
     warnings = ["layout_signal: none (pypdf fallback - no font sizes or bounding boxes)"]
     try:
         reader = pypdf.PdfReader(path)

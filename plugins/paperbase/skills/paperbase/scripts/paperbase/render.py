@@ -159,6 +159,19 @@ def render_kb_index(kb_dir: str, cfg: Dict[str, Any], man: Dict[str, Any], paper
         lines += ["## Corpus overview [SYNTHESIS]", "",
                   overview["field_summary"][:1500], "",
                   "Full synthesis: [synthesis/CORPUS_OVERVIEW.md](synthesis/CORPUS_OVERVIEW.md)", ""]
+    vocabulary = (cfg["terminology"].get("priority_terms") or [])[:24]
+    acronyms = cfg["terminology"].get("acronyms") or {}
+    if vocabulary or acronyms:
+        lines += ["## Corpus vocabulary", "",
+                  "Mined from this corpus (see `reports/tuning_report.md`); these are the terms "
+                  "and expansions `kb search`/`kb context` expand queries with.", ""]
+        if vocabulary:
+            lines.append("**Frequent terms:** " + ", ".join("`%s`" % t for t in vocabulary))
+        if acronyms:
+            lines.append("")
+            lines.append("**Acronyms:** " + ", ".join(
+                "`%s` = %s" % (a, e) for a, e in sorted(acronyms.items())[:24]))
+        lines.append("")
     if topics:
         lines += ["## Topics", ""]
         for topic in sorted(topics, key=lambda t: t["name"].lower()):
