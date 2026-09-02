@@ -1,0 +1,17 @@
+{
+  "name": "evidence-grounded",
+  "displayName": "evidence-grounded",
+  "version": "0.1.0",
+  "description": "An output style for scientific work: Claude cites only sources it retrieved in the current session, prefers a local paperbase knowledge base when one is present, labels unverified recall instead of dressing it as a finding, and keeps the register of data, inference and hypothesis separate.",
+  "author": {
+    "name": "Itamar Elkayam"
+  },
+  "keywords": [
+    "research",
+    "output-style",
+    "citations",
+    "provenance",
+    "literature"
+  ],
+  "license": "MIT"
+}

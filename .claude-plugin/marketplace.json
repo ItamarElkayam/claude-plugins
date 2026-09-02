@@ -6,6 +6,19 @@
   },
   "plugins": [
     {
+      "name": "evidence-grounded",
+      "source": "./plugins/evidence-grounded",
+      "description": "Output style for scientific work: cites only sources retrieved in-session, prefers a local paperbase knowledge base, flags unverified recall, and keeps data, inference and hypothesis distinct.",
+      "version": "0.1.0",
+      "keywords": [
+        "research",
+        "output-style",
+        "citations",
+        "provenance",
+        "literature"
+      ]
+    },
+    {
       "name": "paperbase",
       "source": "./plugins/paperbase",
       "description": "Turn a directory of scientific papers into a durable, incrementally maintainable knowledge base optimized for AI-agent context. Self-installing, self-tuning, provenance-checked.",

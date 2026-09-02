@@ -6,6 +6,7 @@ installable, now and in the future.
 ```
 /plugin marketplace add ItamarElkayam/claude-plugins
 /plugin install paperbase@itamar-tools
+/plugin install evidence-grounded@itamar-tools
 ```
 
 To see what is new later: `/plugin marketplace update itamar-tools`, then
@@ -15,6 +16,7 @@ To see what is new later: `/plugin marketplace update itamar-tools`, then
 
 | Plugin | Version | What it does |
 |---|---|---|
+| **evidence-grounded** | 0.1.0 | An *output style* for scientific work. Claude cites only sources it actually retrieved in the session, never reconstructs a reference from memory, prefers a local paperbase knowledge base when one is present (and says so plainly when the corpus does not cover the question), labels unverified recall instead of dressing it as a finding, keeps authors' hedges and reported quantities intact, and keeps what the data show separate from what it infers and what is only a hypothesis. Turn it on and off per project in `/output-style`. |
 | **paperbase** | 1.1.0 | Turns a directory of scientific papers (PDF, HTML, DOCX, Markdown, text) into a durable, incrementally maintainable knowledge base optimized for AI-agent context: structure-aware extraction with exact source locators, per-paper research profiles, atomic claims whose every quote is verified against the source, cross-paper relations, topic and corpus syntheses, local SQLite FTS retrieval, and content-hash-driven incremental updates. Sets up its own dependencies and tunes itself to the corpus on first run. |
 
 ### paperbase quick start
@@ -31,6 +33,21 @@ Only Python 3.9+ is required. PDF support (PyMuPDF) installs itself on first run
 disable with `--no-install`. `kb doctor` reports the environment. Full docs:
 `plugins/paperbase/skills/paperbase/SKILL.md`.
 
+### evidence-grounded quick start
+
+It ships an output style, not a skill, so there is nothing to run. Once the plugin is
+installed the style appears in the picker:
+
+```
+/output-style            # pick "evidence-grounded"; pick "Default" to turn it off
+```
+
+`/config` -> *Output style* is the same list, and `"outputStyle": "evidence-grounded"` in
+a project's `.claude/settings.local.json` pins it to one repo. The style augments the
+system prompt and keeps the normal coding instructions, so it is safe to leave on in a
+repo that is part paper corpus and part code. It pairs with paperbase but does not
+require it: with no knowledge base present it simply retrieves from the literature.
+
 ## Repository layout
 
 ```
@@ -38,6 +55,7 @@ disable with `--no-install`. `kb doctor` reports the environment. Full docs:
 plugins/<name>/
   .claude-plugin/plugin.json        that plugin's manifest
   skills/<name>/SKILL.md            the skill itself (+ references/, scripts/, …)
+  output-styles/<name>.md           an output style, for plugins that ship one
 new-plugin.sh                       add a new skill as a plugin
 sync.sh                             release an update to an existing plugin
 ```
@@ -50,7 +68,9 @@ git add -A && git commit -m "Add my-skill plugin" && git push
 ```
 
 The script copies the skill in, writes its `plugin.json`, appends the marketplace entry at
-version `0.1.0`, and validates both manifests. Users then run
+version `0.1.0`, and validates both manifests. `new-plugin.sh` scaffolds *skill* plugins; a
+plugin that ships only an output style is three files (`plugin.json`, the marketplace entry,
+and `output-styles/<name>.md`), added by hand — see `plugins/evidence-grounded/`. Users then run
 `/plugin marketplace update itamar-tools && /plugin install my-skill@itamar-tools`.
 
 ## Releasing an update
@@ -58,15 +78,16 @@ version `0.1.0`, and validates both manifests. Users then run
 ```bash
 ./sync.sh paperbase                 # sync from the working copy, keep the version
 ./sync.sh paperbase "" 1.2.0        # sync and bump to 1.2.0
+./sync.sh evidence-grounded         # style plugins sync from ~/.claude/output-styles/<name>.md
 git add -A && git commit -m "paperbase 1.2.0" && git push
 ```
 
-`sync.sh` re-syncs the skill, bumps both manifests, runs the plugin's own tests when it has
+`sync.sh` re-syncs the skill (or the output-style file), bumps both manifests, runs the plugin's own tests when it has
 them, and validates. Tag a release with `claude plugin tag ./plugins/<name>`.
 
 ## Conventions
 
-- One plugin per skill, so people install only what they want and each has its own version.
+- One plugin per skill or style, so people install only what they want and each has its own version.
 - The marketplace `name` (`itamar-tools`) is what users type in `plugin@marketplace`.
   **Never rename it** — that breaks every existing installation.
 - Keep each skill's own docs inside its skill folder; this README is only the catalog.
