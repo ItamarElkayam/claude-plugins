@@ -15,7 +15,7 @@ decision.
 | --- | --- | --- |
 | Markdown, prose, source code, text config, Jupyter notebooks | Allow, no lab cap | The original |
 | CSV | Allow at or below 1 MB | The same editable CSV |
-| Excel workbook | Exclude original; offer one-time CSV migration | Validated CSV(s), each ≤1 MB |
+| Excel workbook | Exclude at any size; no conversion offered | Nothing |
 | Word document | Exclude original; offer one-time Markdown migration | Markdown, plus separately eligible assets |
 | JPEG/PNG/WebP/GIF at or below 1 MB | Allow if valid | The original |
 | TIFF and other heavy image sources | Exclude source at any size; offer a viewing conversion | Only an approved viewing copy |
@@ -55,8 +55,8 @@ complete, naming the file if Git identifies it. See `git-safety.md`.
 Raw experimental format · CSV exceeds 1 MB · image conversion declined · unsupported binary
 format · PDF still exceeds the hosting limit · original replaced by an approved migration ·
 existing ignore rule · conversion failed or unverifiable · PowerPoint: managed locally only ·
-left out by you in this sync · symlink pointing outside the project · cloud file not present
-locally · file could not be read · upload did not complete
+Excel: managed locally only · left out by you in this sync · symlink pointing outside the
+project · cloud file not present locally · file could not be read · upload did not complete
 
 ## A tracked file that becomes ineligible
 
@@ -76,7 +76,7 @@ The file will keep showing as modified in Git. That is correct; do not hide it w
 ## `.gitignore`
 
 Written once at setup from the lab template in `scripts/policy.py` (`IGNORE_TEMPLATE`) —
-type-level rules only: raw formats, slides, heavy image sources, `_archive/`.
+type-level rules only: raw formats, slides, workbooks, heavy image sources, `_archive/`.
 
 After that it belongs to the user. Never rewrite it, never add per-file entries, never remove
 a user's rule to force an upload, and never touch global git config or the global ignore file.

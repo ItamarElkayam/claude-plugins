@@ -94,44 +94,13 @@ Markdown→Word sync.
   complete migration
 - Never overwrite an existing, independently edited `.md` with a new export
 
-## Excel → CSV
+## Excel
 
-**Multi-sheet workbooks ask first.** Say plainly that a multi-sheet workbook cannot be carried
-into Git as one file, then offer:
-
-1. **Split** — one CSV per sheet, named after the sheet, each validated against 1 MB separately
-2. **Skip** — the workbook stays excluded and unchanged; other files continue
-
-Never silently export one sheet and drop the rest.
-
-Then, for a single sheet or after a split is chosen:
-
-1. Convert with openpyxl
-2. Validate each CSV and enforce 1 MB per output
-3. Explain what workbook features are lost
-4. Get explicit approval for archiving the workbook
-5. Move the original into `_archive/` — verify the copy before removing the source
-6. Leave only the CSV(s) as the active tables
-
-The workbook is never uploaded at any size.
-
-- Formula results must be real values. Some readers expose only cached results; a missing cache
-  must never become a blank cell. Use a validated recalculation route or report that the
-  conversion cannot be completed. Never run macros or fetch external links to invent values
-- Preserve textual identifiers, empty values, quoting, Unicode, significant precision
-- New exports: UTF-8, comma delimiters, correct quoting, original row and column order
-- An ordinary sync must never reformat, sort, or coerce an existing tracked CSV
-- Declined or failed migration: original intact and excluded
-- Never delete an archived original or send it to the lab server
-- A workbook appearing later beside an existing CSV: flag the ambiguity, never export over it
-- A later CSV edit is just an edit to the tracked CSV. There is no reverse conversion
-
-## CSV editing caveat
-
-Do not install a CSV editor. If asked: Excel can save CSV, but its import can silently change
-identifiers, date-like strings, and leading zeros — and a valid CSV with a clean diff does not
-prove those changes were intended. The skill cannot repair that from the saved file. Say so
-rather than implying protection.
+No conversion is offered. Every Excel workbook (`.xlsx`, `.xlsm`, `.xls`, `.ods`) is excluded at
+any size, unconditionally — "Excel: managed locally only", the same treatment as PowerPoint.
+Never run `convert.py --kind excel`, never offer a CSV migration, and never move a workbook into
+`_archive/` as part of a migration (there is no migration to complete). The original stays where
+it is, untouched.
 
 ## `_archive/`
 

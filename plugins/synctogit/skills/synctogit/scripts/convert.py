@@ -41,6 +41,17 @@ def do_image(src_abs, stage, rel):
         before = im.size
         if im.mode in ("RGBA", "LA", "P"):
             im = im.convert("RGB")
+        elif im.mode not in ("RGB", "L"):
+            # 16-bit/32-bit/float grayscale (common for chemiluminescence and microscopy
+            # TIFFs, e.g. mode I;16) can't be written as JPEG, which is 8-bit only. Contrast-
+            # stretch to the image's own min/max before quantizing: a naive bit-shift would
+            # often render as solid black when the real signal sits in a narrow band, and this
+            # only rescales for the viewing copy, never the source.
+            im = im.convert("I")
+            lo, hi = im.getextrema()
+            scale = 255.0 / (hi - lo) if hi > lo else 0.0
+            offset = -lo * scale
+            im = im.point(lambda v: v * scale + offset).convert("L")
         # never crop, never relabel: only scale and re-encode
         for scale in (1.0, 0.85, 0.7, 0.55, 0.45, 0.35, 0.25):
             w, h = int(before[0] * scale), int(before[1] * scale)

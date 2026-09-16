@@ -111,6 +111,11 @@ def load_manifest(root):
 def manifest_state(root, rel, size, manifest):
     """new | unchanged | source_changed | output_changed | both_changed | output_missing"""
     entry = manifest["conversions"].get(rel)
+    if not entry and rel.startswith("_archive/"):
+        # A migrated Word source is moved into _archive/ as part of its own migration, but the
+        # manifest still keys the conversion by the pre-archive path. Fall back to that path so
+        # an already-migrated, already-archived source is not re-offered forever.
+        entry = manifest["conversions"].get(rel[len("_archive/"):])
     if not entry:
         declined_hash = manifest["declined"].get(rel)
         if declined_hash and sha(os.path.join(root, rel)) == declined_hash:

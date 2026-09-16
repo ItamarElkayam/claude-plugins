@@ -32,7 +32,8 @@ TEXT_NAMES = {"makefile", "dockerfile", "snakefile", "license", "licence", "read
               "changelog", "authors", "notice", "codeowners", "requirements", "pipfile"}
 
 # extensions that are conversion sources or migration candidates -> worth hashing
-CONVERTIBLE = IMAGE_SOURCE | IMAGE_VIEW | PDF | WORD | EXCEL
+# Excel is deliberately excluded here: it is never migrated, only ever excluded (see classify()).
+CONVERTIBLE = IMAGE_SOURCE | IMAGE_VIEW | PDF | WORD
 
 REFUSED_BASENAMES = {"desktop", "downloads", "documents", "pictures", "movies", "music",
                      "library", "applications", "dropbox", "onedrive", "icloud drive",
@@ -61,6 +62,10 @@ IGNORE_TEMPLATE = """# Lab file policy: these never go to GitHub.
 *.mzXML
 *.pptx
 *.ppt
+*.xlsx
+*.xlsm
+*.xls
+*.ods
 *.tif
 *.tiff
 *.zip
@@ -104,8 +109,7 @@ def output_name(src, kind):
     base, _ = os.path.splitext(src)
     return {"image": base + ".preview.jpg",
             "pdf": base + ".git.pdf",
-            "word": base + ".md",
-            "excel": base + ".csv"}[kind]
+            "word": base + ".md"}[kind]
 
 
 def classify(relpath, size, is_symlink_outside=False, unreadable=False, placeholder=False):
@@ -142,7 +146,7 @@ def classify(relpath, size, is_symlink_outside=False, unreadable=False, placehol
         return "csv", "upload", None, None
 
     if e in EXCEL:
-        return "excel", "migrate", "workbook excluded; offer one-time CSV migration", "excel"
+        return "excel", "exclude", "Excel: managed locally only", None
     if e in WORD:
         return "word", "migrate", "document excluded; offer one-time Markdown migration", "word"
     if e in PDF:

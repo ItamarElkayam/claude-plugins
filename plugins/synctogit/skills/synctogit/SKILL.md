@@ -1,6 +1,6 @@
 ---
 name: synctogit
-description: Sync a local lab project to GitHub under the RechaviLab file policy. Prepares eligible changes, offers conversions for images/PDF/Word/Excel, gets explicit approval in one review, then commits, integrates collaborators' work, and pushes. Also handles repository creation, cloning, and undo. Invoke manually as /synctogit.
+description: Sync a local lab project to GitHub under the RechaviLab file policy. Prepares eligible changes, offers conversions for images/PDF/Word, gets explicit approval in one review, then commits, integrates collaborators' work, and pushes. Excel workbooks are always excluded, never converted. Also handles repository creation, cloning, and undo. Invoke manually as /synctogit.
 disable-model-invocation: true
 ---
 
@@ -72,11 +72,11 @@ before your first conversion in a session. Key points:
 - a source whose hash changed gets a **fresh** preview even if an output already exists
 - if the *output* was edited, leave it alone
 - if both changed, ask
-- multi-sheet Excel: say plainly it can't be carried as one file, then offer one CSV per sheet
-  or skipping
-- Word and Excel: publishing the converted file and archiving the original into `_archive/`
-  are **one** migration. If the archive move is declined, publish nothing and leave the
-  original in place
+- Excel workbooks (`.xlsx`, `.xlsm`, `.xls`, `.ods`) are always excluded, at any size. No CSV
+  migration is offered, ever — treat them exactly like PowerPoint
+- Word: publishing the converted Markdown and archiving the original `.docx`/`.doc` into
+  `_archive/` are **one** migration. If the archive move is declined, publish nothing and leave
+  the original in place
 
 ### 3. Review and approve
 
