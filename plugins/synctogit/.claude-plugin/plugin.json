@@ -1,0 +1,8 @@
+{
+  "name": "synctogit",
+  "version": "0.1.0",
+  "description": "Sync a local lab project to GitHub under the RechaviLab file policy. Prepares eligible changes, offers conversions for images/PDF/Word/Excel, gets explicit approval in one review, then commits, integrates collaborators' work, and pushes. Also handles repository creation, cloning, and undo.",
+  "author": {
+    "name": "Itamar Elkayam"
+  }
+}
